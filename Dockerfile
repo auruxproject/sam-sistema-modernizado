@@ -1,5 +1,5 @@
 # Usar una imagen oficial de PHP con Apache
-FROM php:7.1-apache
+FROM php:7.4-apache
 
 # Instalar dependencias necesarias y extensiones de PHP
 RUN apt-get update && apt-get install -y \

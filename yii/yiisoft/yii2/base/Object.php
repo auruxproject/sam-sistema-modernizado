@@ -74,7 +74,7 @@ use Yii;
  * @author Qiang Xue <qiang.xue@gmail.com>
  * @since 2.0
  */
-class Object
+class BaseObject
 {
     /**
      * Returns the fully qualified name of this class.
@@ -285,4 +285,9 @@ class Object
     {
         return method_exists($this, $name);
     }
+}
+
+// Alias for backward compatibility with PHP 7.2+
+if (!class_exists('yii\\base\\Object', false)) {
+    class_alias('yii\\base\\BaseObject', 'yii\\base\\Object');
 }
