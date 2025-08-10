@@ -8,7 +8,7 @@
 namespace yii\grid;
 
 use Closure;
-use yii\base\Object;
+use yii\base\BaseObject;
 use yii\helpers\Html;
 
 /**

@@ -7,7 +7,7 @@
 
 namespace yii\db;
 
-use yii\base\Object;
+use yii\base\BaseObject;
 use yii\base\InvalidParamException;
 
 /**
