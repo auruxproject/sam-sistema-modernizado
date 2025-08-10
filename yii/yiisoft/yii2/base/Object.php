@@ -288,6 +288,6 @@ class BaseObject
 }
 
 // Alias for backward compatibility with PHP 7.2+
-if (!class_exists('yii\\base\\Object', false)) {
-    class_alias('yii\\base\\BaseObject', 'yii\\base\\Object');
+if (!class_exists('yii\base\Object', false)) {
+    class_alias('yii\base\BaseObject', 'yii\base\Object');
 }
