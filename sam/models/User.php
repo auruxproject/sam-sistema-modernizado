@@ -8,11 +8,12 @@ use yii\behaviors\TimestampBehavior;
 use yii\db\ActiveRecord;
 use yii\helpers\ArrayHelper;
 use yii\web\IdentityInterface;
+use yii\db\Expression;
+use yii\helpers\Security;
 
 /**
  * This is the model class for table "sam.sis_usuario".
  *
- * The followings are the available columns in table 'sam.sis_usuario':
  * @property integer $usr_id
  * @property string $nombre
  * @property string $clave
@@ -40,317 +41,560 @@ use yii\web\IdentityInterface;
  * @property string $fchbaja
  * @property string $fchmod
  * @property integer $usrmod
+ * @property string $auth_key
+ * @property string $password_reset_token
+ * @property integer $created_at
+ * @property integer $updated_at
  */
 class User extends ActiveRecord implements IdentityInterface
 {
+    // Status constants
     const STATUS_ACTIVE = 'A';
+    const STATUS_INACTIVE = 'I';
     const STATUS_DELETED = 'B';
-
-	const GRUPO_ADMIN = 1;
-	
-	public $apenom;
-	public static $procesos = [];   // Array con los procesos del usuario
-	public static $acciones = [];   // Array con las acciones del usuario
-
+    
+    // Group constants
+    const GRUPO_ADMIN = 1;
+    const GRUPO_USUARIO = 2;
+    const GRUPO_INSPECTOR = 3;
+    const GRUPO_CAJERO = 4;
+    
+    // Role constants
+    const ROLE_DISTRIBUIDOR = 1;
+    const ROLE_CENSISTA = 1;
+    const ROLE_INSPECTOR_COMERCIO = 1;
+    const ROLE_INSPECTOR_OBRAS = 1;
+    const ROLE_INSPECTOR_JUZGADO = 1;
+    const ROLE_INSPECTOR_RECLAMOS = 1;
+    const ROLE_ABOGADO = 1;
+    const ROLE_CAJERO = 1;
+    
+    // Password reset token expire time (24 hours)
+    const PASSWORD_RESET_TOKEN_EXPIRE = 86400;
+    
+    public $apenom;
+    public static $procesos = [];
+    public static $acciones = [];
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public static function tableName()
+    public static function tableName(): string
     {
         return 'sam.sis_usuario';
     }
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public function behaviors()
+    public function behaviors(): array
     {
         return [
-            TimestampBehavior::className(),
+            TimestampBehavior::class => [
+                'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => 'updated_at',
+                'value' => new Expression('NOW()'),
+            ],
         ];
     }
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public function rules()
+    public function rules(): array
     {
         return [
-            ['status', 'default', 'value' => self::STATUS_ACTIVE],
-            ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_DELETED]],
-			['nombre, clave, apenom, est, distrib, inspec_inm, inspec_comer, abogado, cajero, fchalta, fchmod', 'required'],
-			['tdoc, oficina, legajo, matricula, grupo, distrib, inspec_inm, inspec_comer, inspec_op, inspec_juz, inspec_recl, abogado, cajero, usrmod', 'numerical', 'integerOnly'=>true],
-			['nombre', 'length', 'max'=>10],
-			['clave', 'length', 'max'=>50],
-			['apenom, domi', 'length', 'max'=>40],
-			['cargo', 'length', 'max'=>30],
-			['est', 'length', 'max'=>1],
-			['tel', 'length', 'max'=>20],
-			['mail', 'length', 'max'=>50],
-			['ndoc, fchbaja', 'safe'],
+            // Status rules
+            ['est', 'default', 'value' => self::STATUS_ACTIVE],
+            ['est', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_INACTIVE, self::STATUS_DELETED]],
+            
+            // Required fields
+            [['nombre', 'clave', 'apenom', 'est'], 'required'],
+            [['fchalta', 'fchmod'], 'required'],
+            
+            // Integer fields
+            [[
+                'tdoc', 'oficina', 'legajo', 'matricula', 'grupo', 'distrib',
+                'inspec_inm', 'inspec_comer', 'inspec_op', 'inspec_juz',
+                'inspec_recl', 'abogado', 'cajero', 'usrmod'
+            ], 'integer'],
+            
+            // String length validations
+            ['nombre', 'string', 'max' => 10],
+            ['clave', 'string', 'max' => 255], // Increased for hashed passwords
+            [['apenom', 'domi'], 'string', 'max' => 40],
+            ['cargo', 'string', 'max' => 30],
+            ['est', 'string', 'max' => 1],
+            ['tel', 'string', 'max' => 20],
+            ['mail', 'email', 'max' => 50],
+            ['ndoc', 'string', 'max' => 20],
+            
+            // Auth key and password reset token
+            ['auth_key', 'string', 'max' => 32],
+            ['password_reset_token', 'string', 'max' => 255],
+            ['password_reset_token', 'unique'],
+            
+            // Safe attributes
+            [['fchbaja', 'created_at', 'updated_at'], 'safe'],
+            
+            // Boolean fields (0 or 1)
+            [[
+                'distrib', 'inspec_inm', 'inspec_comer', 'inspec_op',
+                'inspec_juz', 'inspec_recl', 'abogado', 'cajero'
+            ], 'boolean'],
+            
+            // Group validation
+            ['grupo', 'in', 'range' => [self::GRUPO_ADMIN, self::GRUPO_USUARIO, self::GRUPO_INSPECTOR, self::GRUPO_CAJERO]],
         ];
     }
-
-	public static function grupoInArray($arr_grupo)
-	{
-		return in_array(Yii::$app->user->identity->grupo, $arr_grupo);
-	}
-
-	public static function isActive()
-	{
-		return Yii::$app->user->identity->status == self::STATUS_ACTIVE;
-	}
-
-
-   	public function esAdmin() {
-        return $this->grupo == self::GRUPO_ADMIN;
-    }
-
-
-	/**
-	 * @return array customized attribute labels (name=>label)
-	 */
-	public function attributeLabels()
-	{
-		return array(
-			'usr_id' => 'Código',
-			'nombre' => 'Nombre',
-			'clave' => 'Clave',
-			'apenom' => 'Apellido y Nombre',
-			'domi' => 'Domicilio',
-			'tdoc' => 'Tipo Documento',
-			'ndoc' => 'Nro. Documento',
-			'oficina' => 'Oficina',
-			'cargo' => 'Detalle del Cargo',
-			'legajo' => 'Legajo',
-			'matricula' => 'Matrícula',
-			'grupo' => 'Grupo al que pertenece',
-			'est' => 'Estado',
-			'tel' => 'Teléfono',
-			'mail' => 'Correo eléctronico',
-			'distrib' => 'Es Distribuidor',
-			'inspec_inm' => 'Es Censista',
-			'inspec_comer' => 'Es Inspector de Comercio',
-			'inspec_op' => 'Es Inspector de Obras Part.',
-			'inspec_juz' => 'Es Inspector Juzg.de Faltas',
-			'inspec_recl' => 'Es Inspector de Reclamos',
-			'abogado' => 'Es abogado',
-			'cajero' => 'Es Cajero',
-			'fchalta' => 'Fecha de Alta',
-			'fchbaja' => 'Fecha de Baja',
-			'fchmod' => 'Fecha de Modificación',
-			'usrmod' => 'Usuario que modificó',
-		);
-	}
-
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
+     */
+    public function attributeLabels(): array
+    {
+        return [
+            'usr_id' => 'CÃ³digo',
+            'nombre' => 'Nombre de Usuario',
+            'clave' => 'ContraseÃ±a',
+            'apenom' => 'Apellido y Nombre',
+            'domi' => 'Domicilio',
+            'tdoc' => 'Tipo de Documento',
+            'ndoc' => 'NÃºmero de Documento',
+            'oficina' => 'Oficina',
+            'cargo' => 'Cargo',
+            'legajo' => 'Legajo',
+            'matricula' => 'MatrÃ­cula',
+            'grupo' => 'Grupo',
+            'est' => 'Estado',
+            'tel' => 'TelÃ©fono',
+            'mail' => 'Correo ElectrÃ³nico',
+            'distrib' => 'Es Distribuidor',
+            'inspec_inm' => 'Es Censista',
+            'inspec_comer' => 'Es Inspector de Comercio',
+            'inspec_op' => 'Es Inspector de Obras Particulares',
+            'inspec_juz' => 'Es Inspector de Juzgado de Faltas',
+            'inspec_recl' => 'Es Inspector de Reclamos',
+            'abogado' => 'Es Abogado',
+            'cajero' => 'Es Cajero',
+            'fchalta' => 'Fecha de Alta',
+            'fchbaja' => 'Fecha de Baja',
+            'fchmod' => 'Fecha de ModificaciÃ³n',
+            'usrmod' => 'Usuario que ModificÃ³',
+            'auth_key' => 'Clave de AutenticaciÃ³n',
+            'password_reset_token' => 'Token de RecuperaciÃ³n',
+            'created_at' => 'Creado en',
+            'updated_at' => 'Actualizado en',
+        ];
+    }
+    
+    /**
+     * {@inheritdoc}
      */
     public static function findIdentity($id)
     {
-        return static::findOne(['usr_id' => $id, 'est' => self::STATUS_ACTIVE]);
+        return static::findOne([
+            'usr_id' => $id,
+            'est' => self::STATUS_ACTIVE
+        ]);
     }
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
         throw new NotSupportedException('"findIdentityByAccessToken" is not implemented.');
     }
-
+    
     /**
-     * Busqueda poor nombre de usuario
+     * Finds user by username
      *
      * @param string $nombre
      * @return static|null
      */
-    public static function findByUsername($nombre)
+    public static function findByUsername(string $nombre): ?self
     {
-        return static::findOne(['nombre' => $nombre, 'est' => self::STATUS_ACTIVE]);
+        return static::findOne([
+            'nombre' => $nombre,
+            'est' => self::STATUS_ACTIVE
+        ]);
     }
-
+    
     /**
      * Finds user by password reset token
      *
      * @param string $token password reset token
      * @return static|null
      */
-    public static function findByPasswordResetToken($token)
+    public static function findByPasswordResetToken(string $token): ?self
     {
         if (!static::isPasswordResetTokenValid($token)) {
             return null;
         }
-
+        
         return static::findOne([
             'password_reset_token' => $token,
             'est' => self::STATUS_ACTIVE,
         ]);
     }
-
+    
     /**
      * Finds out if password reset token is valid
      *
      * @param string $token password reset token
-     * @return boolean
+     * @return bool
      */
-    public static function isPasswordResetTokenValid($token)
+    public static function isPasswordResetTokenValid(string $token): bool
     {
         if (empty($token)) {
             return false;
         }
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
+        
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? self::PASSWORD_RESET_TOKEN_EXPIRE;
         $parts = explode('_', $token);
         $timestamp = (int) end($parts);
+        
         return $timestamp + $expire >= time();
     }
-
-	
-/************************************************   METODOS PROPIOS   ************************************************************/	
-
+    
     /**
-	 * Cargar los procesos habilitados para el usuario
-	 */
-	public function loadProcesos($usr) {
-		$sql = "select pro_id proceso from sam.sis_usuario_proceso ";
-        $sql .= "Where usr_id = ".$usr." Order By pro_id";
-		$per=Yii::$app->db->createCommand($sql)->queryColumn();
-		Yii::$app->session['procesos'] = $per;
-		//$this->procesos = $per;			
-	}
-
-
-    /**
-	 * Cargar las acciones habilitadas para el usuario
-	 */
-	public function loadAcciones($usr) {
-		$sql = "select distinct p.accion from sam.sis_usuario_proceso up inner join sam.sis_proceso_accion p on up.pro_id = p.pro_id ";
-        $sql .= "Where up.usr_id = ".$usr." Order By p.accion"; 
-		$acc=Yii::$app->db->createCommand($sql)->queryColumn();
-		Yii::$app->session['acciones'] = ArrayHelper::toArray($acc);
-		//$this->acciones = $acc;			
-	}
-
-
-	/**
-	 * Funcion que verifica si el usuario tiene determinado permiso
-	 * @param smallint $proceso Codigo del Proceso 
-	 */
-	public function existePermiso($proceso) {
-		if (Yii::$app->user->isGuest) 
-			return false;
-		else
-			return in_array($proceso, Yii::$app->session['permisos']);
-			//return in_array($proceso, $this->getPermisos());
-	}
-
-
-
-/**************************************************   PASSWORD   ************************************************************/	
-
-    /**
-     * Validates password
-     *
-     * @param string $pass_usuario password to validate
-     * @return boolean if password provided is valid for current user
-     */
-	public function validatePassword($pass_usuario) {
-	 	return $this->hashPassword($pass_usuario)===$this->clave;
-	}
-
-
-	/**
-	 * Encripta clave
-	 * @param string $pass_usuario password a encriptar
-	 */
-	public function hashPassword($pass_usuario) {
-		// Encriptacion con BCrypt
-		//password_hash($this->clave, PASSWORD_BCRYPT)
-	 	return md5($pass_usuario);
-	}
-
-
-	 /**
-	 * Cambiar clave de usuario
-	 */
-	public function setNuevaPassword($usrnom, $new_password) {
-		$sql = "Update sam.sis_usuario set clave = '".$this->hashPassword($new_password)."' Where nombre = '".$usrnom."'";
-		return Yii::$app->db->createCommand($sql)->execute() > 0;
-	}
-
-	
-    /**
-     * Generates password hash from password and sets it to the model
-     *
-     * @param string $password
-     */
-    public function setPassword($password)
-    {
-        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
-    }
-
-    /**
-     * Generates "remember me" authentication key
-     */
-    public function generateAuthKey()
-    {
-        $this->auth_key = Yii::$app->security->generateRandomString();
-    }
-
-    /**
-     * Generates new password reset token
-     */
-    public function generatePasswordResetToken()
-    {
-        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-    }
-
-    /**
-     * Removes password reset token
-     */
-    public function removePasswordResetToken()
-    {
-        $this->password_reset_token = null;
-    }
-	
-	
-/************************************************   PROPIEDADES   ************************************************************/	
-	
-    /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function getId()
     {
         return $this->getPrimaryKey();
     }
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public function getAuthKey()
+    public function getAuthKey(): ?string
     {
-        return $this->authKey;
+        return $this->auth_key;
     }
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
-    public function validateAuthKey($authKey)
+    public function validateAuthKey($authKey): bool
     {
-        return $this->authKey === $authKey;
+        return $this->getAuthKey() === $authKey;
     }
-
-
+    
     /**
-     * Devuelve array de permisos
+     * Validates password
+     *
+     * @param string $password password to validate
+     * @return bool if password provided is valid for current user
      */
-    public function getPermisos()
+    public function validatePassword(string $password): bool
     {
-        return $this->permisos;
+        // Check if password is already hashed with password_hash()
+        if (password_verify($password, $this->clave)) {
+            return true;
+        }
+        
+        // Fallback to MD5 for legacy passwords
+        return $this->clave === md5($password);
     }
-
-
-
-
+    
+    /**
+     * Generates password hash from password and sets it to the model
+     *
+     * @param string $password
+     */
+    public function setPassword(string $password): void
+    {
+        $this->clave = password_hash($password, PASSWORD_DEFAULT);
+    }
+    
+    /**
+     * Legacy method for MD5 password hashing (deprecated)
+     *
+     * @param string $password
+     * @return string
+     * @deprecated Use setPassword() instead
+     */
+    public function hashPassword(string $password): string
+    {
+        return md5($password);
+    }
+    
+    /**
+     * Changes user password (legacy method)
+     *
+     * @param string $username
+     * @param string $newPassword
+     * @return bool
+     */
+    public function setNuevaPassword(string $username, string $newPassword): bool
+    {
+        $user = static::findByUsername($username);
+        if ($user) {
+            $user->setPassword($newPassword);
+            return $user->save(false);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Generates "remember me" authentication key
+     */
+    public function generateAuthKey(): void
+    {
+        $this->auth_key = Yii::$app->security->generateRandomString();
+    }
+    
+    /**
+     * Generates new password reset token
+     */
+    public function generatePasswordResetToken(): void
+    {
+        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
+    }
+    
+    /**
+     * Removes password reset token
+     */
+    public function removePasswordResetToken(): void
+    {
+        $this->password_reset_token = null;
+    }
+    
+    /**
+     * Check if user belongs to specific groups
+     *
+     * @param array $groups
+     * @return bool
+     */
+    public static function grupoInArray(array $groups): bool
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+        
+        return in_array(Yii::$app->user->identity->grupo, $groups, true);
+    }
+    
+    /**
+     * Check if user is active
+     *
+     * @return bool
+     */
+    public static function isActive(): bool
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+        
+        return Yii::$app->user->identity->est === self::STATUS_ACTIVE;
+    }
+    
+    /**
+     * Check if user is admin
+     *
+     * @return bool
+     */
+    public function esAdmin(): bool
+    {
+        return $this->grupo === self::GRUPO_ADMIN;
+    }
+    
+    /**
+     * Load user processes
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function loadProcesos(int $userId): array
+    {
+        try {
+            $sql = 'SELECT pro_id FROM sam.sis_usuario_proceso WHERE usr_id = :userId ORDER BY pro_id';
+            $procesos = Yii::$app->db->createCommand($sql, [':userId' => $userId])->queryColumn();
+            
+            Yii::$app->session->set('procesos', $procesos);
+            self::$procesos = $procesos;
+            
+            return $procesos;
+        } catch (\Exception $e) {
+            Yii::error('Error loading user processes: ' . $e->getMessage(), __METHOD__);
+            return [];
+        }
+    }
+    
+    /**
+     * Load user actions
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function loadAcciones(int $userId): array
+    {
+        try {
+            $sql = 'SELECT DISTINCT p.accion FROM sam.sis_usuario_proceso up '
+                 . 'INNER JOIN sam.sis_proceso_accion p ON up.pro_id = p.pro_id '
+                 . 'WHERE up.usr_id = :userId ORDER BY p.accion';
+            
+            $acciones = Yii::$app->db->createCommand($sql, [':userId' => $userId])->queryColumn();
+            
+            Yii::$app->session->set('acciones', $acciones);
+            self::$acciones = $acciones;
+            
+            return $acciones;
+        } catch (\Exception $e) {
+            Yii::error('Error loading user actions: ' . $e->getMessage(), __METHOD__);
+            return [];
+        }
+    }
+    
+    /**
+     * Check if user has specific permission
+     *
+     * @param int $proceso
+     * @return bool
+     */
+    public function existePermiso(int $proceso): bool
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+        
+        $permisos = Yii::$app->session->get('permisos', []);
+        return in_array($proceso, $permisos, true);
+    }
+    
+    /**
+     * Get user permissions
+     *
+     * @return array
+     */
+    public function getPermisos(): array
+    {
+        return Yii::$app->session->get('permisos', []);
+    }
+    
+    /**
+     * Check if user has specific role
+     *
+     * @param string $role
+     * @return bool
+     */
+    public function hasRole(string $role): bool
+    {
+        switch ($role) {
+            case 'distribuidor':
+                return (bool) $this->distrib;
+            case 'censista':
+                return (bool) $this->inspec_inm;
+            case 'inspector_comercio':
+                return (bool) $this->inspec_comer;
+            case 'inspector_obras':
+                return (bool) $this->inspec_op;
+            case 'inspector_juzgado':
+                return (bool) $this->inspec_juz;
+            case 'inspector_reclamos':
+                return (bool) $this->inspec_recl;
+            case 'abogado':
+                return (bool) $this->abogado;
+            case 'cajero':
+                return (bool) $this->cajero;
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * Get user roles
+     *
+     * @return array
+     */
+    public function getRoles(): array
+    {
+        $roles = [];
+        
+        if ($this->distrib) $roles[] = 'distribuidor';
+        if ($this->inspec_inm) $roles[] = 'censista';
+        if ($this->inspec_comer) $roles[] = 'inspector_comercio';
+        if ($this->inspec_op) $roles[] = 'inspector_obras';
+        if ($this->inspec_juz) $roles[] = 'inspector_juzgado';
+        if ($this->inspec_recl) $roles[] = 'inspector_reclamos';
+        if ($this->abogado) $roles[] = 'abogado';
+        if ($this->cajero) $roles[] = 'cajero';
+        
+        return $roles;
+    }
+    
+    /**
+     * Get full name
+     *
+     * @return string
+     */
+    public function getFullName(): string
+    {
+        return $this->apenom ?: $this->nombre;
+    }
+    
+    /**
+     * Before save event
+     *
+     * @param bool $insert
+     * @return bool
+     */
+    public function beforeSave($insert): bool
+    {
+        if (parent::beforeSave($insert)) {
+            if ($insert) {
+                $this->generateAuthKey();
+                $this->fchalta = date('Y-m-d H:i:s');
+            }
+            $this->fchmod = date('Y-m-d H:i:s');
+            
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Get status label
+     *
+     * @return string
+     */
+    public function getStatusLabel(): string
+    {
+        switch ($this->est) {
+            case self::STATUS_ACTIVE:
+                return 'Activo';
+            case self::STATUS_INACTIVE:
+                return 'Inactivo';
+            case self::STATUS_DELETED:
+                return 'Eliminado';
+            default:
+                return 'Desconocido';
+        }
+    }
+    
+    /**
+     * Get group label
+     *
+     * @return string
+     */
+    public function getGroupLabel(): string
+    {
+        switch ($this->grupo) {
+            case self::GRUPO_ADMIN:
+                return 'Administrador';
+            case self::GRUPO_USUARIO:
+                return 'Usuario';
+            case self::GRUPO_INSPECTOR:
+                return 'Inspector';
+            case self::GRUPO_CAJERO:
+                return 'Cajero';
+            default:
+                return 'Sin Grupo';
+        }
+    }
 }

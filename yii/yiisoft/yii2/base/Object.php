@@ -287,5 +287,8 @@ class BaseObject
     }
 }
 
-// Note: Class renamed to BaseObject for PHP 7.2+ compatibility
-// Legacy code should use yii\base\BaseObject instead of yii\base\Object
+// Compatibility layer for PHP 7.2+
+// Create alias only if Object class doesn't exist as reserved keyword
+if (!class_exists('Object', false)) {
+    class_alias('yii\base\BaseObject', 'yii\base\Object');
+}

@@ -6,109 +6,145 @@ use Yii;
 use yii\filters\AccessControl;
 use yii\web\Controller;
 use yii\filters\VerbFilter;
+use yii\web\Response;
+use yii\web\NotFoundHttpException;
+use yii\web\BadRequestHttpException;
+use yii\helpers\Url;
+use yii\data\SqlDataProvider;
+use yii\export2excel\Export2ExcelBehavior;
+
 use app\utils\db\utb;
 use app\models\LoginForm;
 use app\models\CbioclaveForm;
 use app\models\ContactForm;
 use app\models\ConvertForm;
 use app\models\taux\tablaAux;
-use yii\export2excel\Export2ExcelBehavior;
-
-use yii\data\SqlDataProvider;
+use app\models\SignupForm;
+use app\models\PasswordResetRequestForm;
+use app\models\ResetPasswordForm;
+use yii\base\InvalidParamException;
 
 /**
- * Site controller
+ * Controlador principal del sitio ISURGOB
+ * Maneja autenticación, autorización y funcionalidades principales
+ * 
+ * @author Sistema ISURGOB
+ * @version 2.0
  */
-class SiteController extends Controller {
-
+class SiteController extends Controller
+{
     /**
-     * @inheritdoc
+     * Configuración de comportamientos del controlador
+     * @return array
      */
-	public function behaviors()
-	{
-	    return [
-	        'access' => [
-	            'class' => AccessControl::className(),
-	            'only' => ['logout', 'signup', 'about'],
-	            'rules' => [
-	                [
-	                    'actions' => ['login', 'signup', 'error','logout'],
-	                    'allow' => true,
-	                    'roles' => ['?'],
-	                ],
-	                [
-	                    'actions' => ['about', 'index','logout'],
-	                    'allow' => true,
-	                    'roles' => ['@'],
-	                ],
-	            ],
-	        ],
-	        'verbs' => [
-	            'class' => VerbFilter::className(),
-	            'actions' => [
-	                'logout' => ['get'],
-	            ],
-	        ],
-	        'export2excel' => [
-               'class' => Export2ExcelBehavior::className(),
-               //'prefixStr' => yii::$app->user->identity->username,
-               //'suffixStr' => date('Ymd-His'),
-          ],
-	    ];
-	}
-
-
-	public function beforeAction($action) {
-	    if (!parent::beforeAction($action)) {
-	        return false;
-	    }
-
-	    $operacion = str_replace("/", "-", Yii::$app->controller->route);
-
-	    $permitirSiempre = [
-				'site-captcha', 'site-signup', 'site-index', 'site-error', 'site-contact', 'site-login', 'site-logout', 'site-about', 'site-cbioclave', 
-				'site-pdflist', 'site-exportar', 'site-download', 'site-auxeditredirect', 'site-limpiarvariablereporte'
-		];
-
-	    if (in_array($operacion, $permitirSiempre)) {
-	        return true;
-	    }
-
-		// Si el usuario no esta logueado o tiene la clave vacia no admito
-		if (\Yii::$app->user->isGuest) {
-			echo $this->render('nopermitido');
-			return false;
-		} else {
-			//if (isset(Yii::$app->session['user_sinclave'])) {
-				if (Yii::$app->session['user_sinclave'] == 1) {
-					echo $this->render('cbioclave');
-					return false;
-				}
-			//} else
-			//	return false;
-		}
-
-	    if (!utb::getExisteAccion($operacion)) {
-	        echo $this->render('nopermitido');
-	        return false;
-	    }
-
-	    if ($operacion == 'site-auxedit'){
-		    $t = (isset($_GET['t']) ? $_GET['t'] : 0);
-
-		    $procesotaux = utb::getCampo('sam.tabla_aux','cod='.$t,'accesocons');
-
-		    if (!utb::getExisteProceso($procesotaux)){
-		    	echo $this->render('nopermitido');
-		    	return false;
-		    }
-	    }
-
-	    return true;
-	}
+    public function behaviors()
+    {
+        return [
+            'access' => [
+                'class' => AccessControl::class,
+                'only' => ['logout', 'signup', 'about', 'config'],
+                'rules' => [
+                    [
+                        'actions' => ['login', 'signup', 'error', 'logout', 'request-password-reset', 'reset-password'],
+                        'allow' => true,
+                        'roles' => ['?'],
+                    ],
+                    [
+                        'actions' => ['about', 'index', 'logout', 'config'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                    ],
+                ],
+            ],
+            'verbs' => [
+                'class' => VerbFilter::class,
+                'actions' => [
+                    'logout' => ['post', 'get'],
+                    'delete' => ['post'],
+                ],
+            ],
+            'export2excel' => [
+                'class' => Export2ExcelBehavior::class,
+                'prefixStr' => function() {
+                    return Yii::$app->user->isGuest ? 'guest' : Yii::$app->user->identity->username;
+                },
+                'suffixStr' => date('Ymd-His'),
+            ],
+        ];
+    }
 
     /**
-     * @inheritdoc
+     * Verificación de permisos antes de ejecutar acciones
+     * @param \yii\base\Action $action
+     * @return bool
+     * @throws NotFoundHttpException
+     */
+    public function beforeAction($action)
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $operacion = str_replace('/', '-', Yii::$app->controller->route);
+
+        // Acciones que siempre están permitidas
+        $permitirSiempre = [
+            'site-captcha', 'site-signup', 'site-index', 'site-error', 'site-contact', 
+            'site-login', 'site-logout', 'site-about', 'site-cbioclave', 'site-pdflist', 
+            'site-exportar', 'site-download', 'site-auxeditredirect', 'site-limpiarvariablereporte',
+            'site-request-password-reset', 'site-reset-password'
+        ];
+
+        if (in_array($operacion, $permitirSiempre)) {
+            return true;
+        }
+
+        // Verificar si el usuario está autenticado
+        if (Yii::$app->user->isGuest) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['error' => 'Usuario no autenticado'];
+            }
+            return $this->render('nopermitido');
+        }
+
+        // Verificar si el usuario necesita cambiar la clave
+        if (Yii::$app->session->get('user_sinclave', 0) == 1) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['error' => 'Debe cambiar su contraseña'];
+            }
+            return $this->render('cbioclave');
+        }
+
+        // Verificar permisos específicos de la acción
+        if (!utb::getExisteAccion($operacion)) {
+            if (Yii::$app->request->isAjax) {
+                Yii::$app->response->format = Response::FORMAT_JSON;
+                return ['error' => 'Acción no permitida'];
+            }
+            return $this->render('nopermitido');
+        }
+
+        // Verificaciones específicas para auxedit
+        if ($operacion == 'site-auxedit') {
+            $t = Yii::$app->request->get('t', 0);
+            if (!$t) {
+                throw new BadRequestHttpException('Parámetro t requerido');
+            }
+
+            $procesotaux = utb::getCampo('sam.tabla_aux', 'cod=' . intval($t), 'accesocons');
+            if (!utb::getExisteProceso($procesotaux)) {
+                return $this->render('nopermitido');
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Configuración de acciones del controlador
+     * @return array
      */
     public function actions()
     {
@@ -119,6 +155,8 @@ class SiteController extends Controller {
             'captcha' => [
                 'class' => 'yii\captcha\CaptchaAction',
                 'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
+                'minLength' => 4,
+                'maxLength' => 6,
             ],
             'download' => [
                 'class' => 'yii\export2excel\DownloadAction',
@@ -126,100 +164,141 @@ class SiteController extends Controller {
         ];
     }
 
-
+    /**
+     * Página principal del sistema
+     * @return string
+     */
     public function actionIndex()
     {
+        // Registrar acceso al sistema
+        if (!Yii::$app->user->isGuest) {
+            Yii::info('Usuario ' . Yii::$app->user->identity->username . ' accedió al sistema', 'app');
+        }
+        
         return $this->render('index');
     }
 
-
+    /**
+     * Acción de login
+     * @return string|Response
+     */
     public function actionLogin()
     {
-        if (!\Yii::$app->user->isGuest) {
-            if (Yii::$app->session['user_sinclave'] == 1){
-				Yii::$app->session['user_sinclave'] = 0;
-				$this->redirect(['cbioclave']);
-			}else
-				return $this->goHome();
+        if (!Yii::$app->user->isGuest) {
+            if (Yii::$app->session->get('user_sinclave', 0) == 1) {
+                Yii::$app->session->set('user_sinclave', 0);
+                return $this->redirect(['cbioclave']);
+            }
+            return $this->goHome();
         }
 
         $model = new LoginForm();
+        
         if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            if (Yii::$app->session['user_sinclave'] == 1){
-				Yii::$app->session['user_sinclave'] = 0;
-				$this->redirect(['cbioclave']);
-			}else{
-				return $this->render('index');
-			}
-        } else {
-            return $this->render('login', [
-                'model' => $model,
-				'municipios' => $model->CargarMunicipios()
-            ]);
+            if (Yii::$app->session->get('user_sinclave', 0) == 1) {
+                Yii::$app->session->set('user_sinclave', 0);
+                return $this->redirect(['cbioclave']);
+            }
+            return $this->goHome();
         }
+
+        return $this->render('login', [
+            'model' => $model,
+            'municipios' => $model->CargarMunicipios()
+        ]);
     }
 
-
+    /**
+     * Acción de logout
+     * @return Response
+     */
     public function actionLogout()
     {
-        (new LoginForm)->getGrabarSalida();
-
-        Yii::$app->user->logout();
+        if (!Yii::$app->user->isGuest) {
+            // Registrar salida del usuario
+            $username = Yii::$app->user->identity->username;
+            (new LoginForm())->getGrabarSalida();
+            Yii::$app->user->logout();
+            Yii::info('Usuario ' . $username . ' cerró sesión', 'app');
+        }
 
         return $this->goHome();
     }
 
-
-    public function actionCbioclave() {
-       if (\Yii::$app->user->isGuest) {
+    /**
+     * Cambio de contraseña obligatorio
+     * @return string|Response
+     */
+    public function actionCbioclave()
+    {
+        if (Yii::$app->user->isGuest) {
             return $this->goHome();
         }
+
         $model = new CbioclaveForm();
+        
         if ($model->load(Yii::$app->request->post()) && $model->cbioclave()) {
-        	return $this->goBack();
-        } else {
-            return $this->render('cbioclave', [
-                'model' => $model,
-            ]);
+            Yii::$app->session->setFlash('success', 'Contraseña actualizada correctamente');
+            return $this->goBack();
         }
+
+        return $this->render('cbioclave', [
+            'model' => $model,
+        ]);
     }
 
-
-    public function actionContact() {
+    /**
+     * Página de contacto
+     * @return string|Response
+     */
+    public function actionContact()
+    {
         $model = new ContactForm();
+        
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             if ($model->contact(Yii::$app->params['adminEmail'])) {
                 Yii::$app->session->setFlash('success', 'Gracias por contactarnos. Responderemos a la mayor brevedad posible.');
             } else {
                 Yii::$app->session->setFlash('error', 'Se ha producido un error al enviar el correo electrónico.');
             }
-
             return $this->refresh();
-        } else {
-            return $this->render('contact', [
-                'model' => $model,
-            ]);
         }
+
+        return $this->render('contact', [
+            'model' => $model,
+        ]);
     }
 
-
+    /**
+     * Página de configuración del sistema
+     * @return string
+     */
     public function actionConfig()
     {
-		return $this->render('config');
+        return $this->render('config');
     }
 
+    /**
+     * Página acerca de
+     * @return string
+     */
     public function actionAbout()
     {
         return $this->render('about');
     }
 
-
+    /**
+     * Registro de nuevos usuarios
+     * @return string|Response
+     */
     public function actionSignup()
     {
         $model = new SignupForm();
+        
         if ($model->load(Yii::$app->request->post())) {
             if ($user = $model->signup()) {
                 if (Yii::$app->getUser()->login($user)) {
+                    Yii::$app->session->setFlash('success', 'Usuario registrado correctamente');
                     return $this->goHome();
                 }
             }
@@ -230,17 +309,20 @@ class SiteController extends Controller {
         ]);
     }
 
+    /**
+     * Solicitud de restablecimiento de contraseña
+     * @return string|Response
+     */
     public function actionRequestPasswordReset()
     {
         $model = new PasswordResetRequestForm();
+        
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             if ($model->sendEmail()) {
-                Yii::$app->getSession()->setFlash('success', 'Revise su correo electr�nico para obtener m�s instrucciones.');
-
+                Yii::$app->session->setFlash('success', 'Revise su correo electrónico para obtener más instrucciones.');
                 return $this->goHome();
-            } else {
-                Yii::$app->getSession()->setFlash('error', 'Lo sentimos, no podemos restablecer la contrase�a para el usuario proporcionado.');
             }
+            Yii::$app->session->setFlash('error', 'Lo sentimos, no podemos restablecer la contraseña para el usuario proporcionado.');
         }
 
         return $this->render('requestPasswordResetToken', [
@@ -248,6 +330,12 @@ class SiteController extends Controller {
         ]);
     }
 
+    /**
+     * Restablecimiento de contraseña
+     * @param string $token
+     * @return string|Response
+     * @throws BadRequestHttpException
+     */
     public function actionResetPassword($token)
     {
         try {
@@ -257,8 +345,7 @@ class SiteController extends Controller {
         }
 
         if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
-            Yii::$app->getSession()->setFlash('success', 'Nueva contrase�a ha sido actualizada');
-
+            Yii::$app->session->setFlash('success', 'Nueva contraseña ha sido actualizada');
             return $this->goHome();
         }
 
@@ -267,390 +354,573 @@ class SiteController extends Controller {
         ]);
     }
 
-
-/***************************************  AUXILIARES  ****************************************************/
-    public function actionTaux() {
-		return $this->render('//taux/taux');
+    /***************************************  AUXILIARES  ****************************************************/
+    
+    /**
+     * Página principal de tablas auxiliares
+     * @return string
+     */
+    public function actionTaux()
+    {
+        return $this->render('//taux/taux');
     }
-
-
-    public function actionAuxedit($t) {
-		$consulta = 1;// inicializo consulta = 1, para ver en modo consulta
-		$error = '';
-		$mensaje='';
-		
-		$part_nom = '';
-		$nropart = '';
-		
-		$part_nom2 = '';
-		$nropart2 = '';
-		
-		$part_nom3 = '';
-		$nropart3 = '';
-			
-		if(isset($_POST['txAccion'])) $consulta = $_POST['txAccion'];
-		if(isset($_POST['txForm'])) $txForm = $_POST['txForm'];
-
-		$model = tablaAux::findOne($t);
-
-		if ($model->link == '')
-		{
-			$url = 'auxedit';
-			$model->nombrelong = tablaAux::GetCampoLong($model->nombre,'nombre');
-			$model->codlong = ($model->tcod == 'N' ? 4 : tablaAux::GetCampoLong($model->nombre,'cod'));
-			if ($t == 211) $model->codlong = 6;
-			$model->CargarTercerCampo();
-			$tabla = tablaAux::CargarTabla($model->nombre, $model->tercercamponom);
-		}else {
-			if($t==37){
-				$url = $model->link;
-				$tabla = tablaAux::CargarTabla('cem_cuadro');
-			}elseif($t==133){
-				$url = $model->link;
-
-				$tabla = (new tablaAux())->CargarTablaOficina();
-			}elseif($t==139){
-				$url = $model->link;
-
-				$tabla = (new tablaAux())->CargarTablaSecretaria();	
-			}else{
-				$url = $model->link;
-				$tabla = tablaAux::CargarTabla($model->nombre);
-			}
-		}
-
-		if ($consulta != 1)
-		{
-			if ($model->link == "") // tablas p�gina comunes comunes
-			{
-				$cod = (isset($_POST['txCod']) ? $_POST['txCod'] : 0);
-				$nombre = (isset($_POST['txNombre']) ? $_POST['txNombre'] : '');
-				$tercercampo = (isset($_POST['txTercerCampo']) && $_POST['txTercerCampo'] !='' ? $_POST['txTercerCampo'] : 0);
-
-				if ($consulta != 2) $error = $model->grabarTablaAux($consulta,$cod,$nombre,$tercercampo);
-				if ($consulta == 2) $error = $model->borrarTablaAux($cod);
-
-				if($consulta == 2 and $error=='') $mensaje='delete';
-				if($consulta != 2 and $error=='') $mensaje='grabado';
-				if($consulta == 0 and $error!='') $consulta=0;
-				if($consulta == 3 and $error!='') $consulta=3;
-
-			}else {
-				// tablas con otras p�ginas
-				$cod = (isset($_POST['txCod']) ? $_POST['txCod'] : 0);
-				$nombre = (isset($_POST['txNombre']) ? $_POST['txNombre'] : '');
-				$tercercampo = (isset($_POST['txTercerCampo']) ? $_POST['txTercerCampo'] : 0);
-				// solo tabla domi_calle
-				$tcalle = (isset($_POST['tipo']) ? $_POST['tipo'] : 0);
-				// solo tabla banco
-				$bco_ent = (isset($_POST['bco_ent']) ? $_POST['bco_ent'] : 0);
-				$bco_suc = (isset($_POST['bco_suc']) ? $_POST['bco_suc'] : 0);
-				$domi = (isset($_POST['domi']) ? $_POST['domi'] : 0);
-				$tel = (isset($_POST['tel']) ? $_POST['tel'] : 0);
-				// solo tabla muni_oficina
-				$resp = (isset($_POST['resp']) ? $_POST['resp'] : 0);
-				$sec_id = (isset($_POST['sec_id']) ? $_POST['sec_id'] : 0);
-                
-				// solo tabla y muni_oficina muni_sec
-				$part_id = (isset($_POST['part_id']) ? $_POST['part_id'] : 0 );
-				$part_id2 = (isset($_POST['part_id2']) ? $_POST['part_id2'] : 0 );
-				$part_id3 = (isset($_POST['part_id3']) ? $_POST['part_id3'] : 0 );
-
-				if ($consulta != 2 and $t==130) $error = $model->grabarTablaAuxDomiCalle($consulta,$cod,$nombre,$tcalle);
-				if ($consulta != 2 and $t==80) $error = $model->grabarTablaAuxBancoSuc($consulta,$bco_ent,$bco_suc,$nombre,$domi,$tel);
-				if ($consulta == 2 and $t==80) $error = $model->borrarTablaAuxBancoSuc($bco_ent,$bco_suc);
-				if ($consulta != 2 and $t==133) $error = $model->grabarTablaAuxOficina($consulta,$cod,$nombre,$resp,$sec_id,$part_id);
-				if ($consulta != 2 and $t==139) $error = $model->grabarTablaAuxSecretaria($consulta,$cod,$nombre,$part_id,$part_id2,$part_id3);
-
-				if ($consulta == 2 and $t!=80 and $t!=128) $error = $model->borrarTablaAux($cod);
-
-				if($consulta == 2 and $error=='') $mensaje='delete';
-				if($consulta != 2 and $error=='') $mensaje='grabado';
-				if($consulta == 0 and $error!='') $consulta=0;
-				if($consulta == 3 and $error!='') $consulta=3;
-
-			}
-
-			if ($error == '') return $this->redirect(['auxeditredirect', 't' => $t,'mensaje'=>$mensaje,'consulta'=>$consulta]);
-		}
-
-		if ($error == '')
-		{
-			$cod = '';
-			$nombre = '';
-			$tercercampo = '';
-			$tcalle = 0;
-			$bco_ent = '';
-			$bco_suc = '';
-			$domi = '';
-			$tel = '';
-
-			$resp = '';
-			$sec_id = 0;
-			
-			$part_id = 0;
-			$part_nom = '';
-			$nropart = '';
-			
-			$part_id2 = 0;
-			$part_nom2 = '';
-			$nropart2 = '';
-			
-			$part_id3 = 0;
-			$part_nom3 = '';
-			$nropart3 = '';
-
-			$consulta = 1;
-			$mensaje = 1;
-		}
-		
-		if( Yii::$app->request->get( '_pjax', '' ) == '#pjaxCambiaPartida' ){
-			$nropart = Yii::$app->request->get( 'partida', 0 );
-			$cond = 'tiene_hijo=false AND anio = ' . date('Y');
-
-			//INICIO Cargar y Validar Partida
-			if( strpos( $nropart, '.' ) > -1 ){
-				$cond .= " and (formato = '" . $nropart .
-						"' OR formatoaux = '" .  $nropart . "')";
-			} else {
-				$cond .= " and (nropart = " . intVal( $nropart  ) . " or part_id=" . intVal( $nropart  ) . ")";
-			}
-			
-			$part_id = intVal(utb::getCampo("fin.v_part", $cond, "part_id"));
-			$part_nom = utb::getCampo("fin.v_part", "part_id=" . $part_id, "nombre");
-		}
-		
-		if( Yii::$app->request->get( '_pjax', '' ) == '#pjaxCambiaPartida2' ){
-			$nropart2 = Yii::$app->request->get( 'partida2', 0 );
-			$cond = 'tiene_hijo=false AND anio = ' . date('Y');
-
-			//INICIO Cargar y Validar Partida
-			if( strpos( $nropart2, '.' ) > -1 ){
-				$cond .= " and (formato = '" . $nropart2 .
-						"' OR formatoaux = '" .  $nropart2 . "')";
-			} else {
-				$cond .= " and (nropart = " . intVal( $nropart2  ) . " or part_id=" . intVal( $nropart2  ) . ")";
-			}
-			
-			$part_id2 = intVal(utb::getCampo("fin.v_part", $cond, "part_id"));
-			$part_nom2 = utb::getCampo("fin.v_part", "part_id=" . $part_id2, "nombre");
-		}
-		
-		if( Yii::$app->request->get( '_pjax', '' ) == '#pjaxCambiaPartida3' ){
-			$nropart3 = Yii::$app->request->get( 'partida3', 0 );
-			$cond = 'tiene_hijo=false AND anio = ' . date('Y');
-
-			//INICIO Cargar y Validar Partida
-			if( strpos( $nropart3, '.' ) > -1 ){
-				$cond .= " and (formato = '" . $nropart3 .
-						"' OR formatoaux = '" .  $nropart3 . "')";
-			} else {
-				$cond .= " and (nropart = " . intVal( $nropart3  ) . " or part_id=" . intVal( $nropart3  ) . ")";
-			}
-			
-			$part_id3 = intVal(utb::getCampo("fin.v_part", $cond, "part_id"));
-			$part_nom3 = utb::getCampo("fin.v_part", "part_id=" . $part_id3, "nombre");
-		}
-
-		return $this->render('//taux/'.$url,['model' => $model, 'tabla' => $tabla, 'error' => $error,'mensaje'=>$mensaje,
-					'cod' => $cod,'nombre' => $nombre, 'tercercampo' => $tercercampo, 'tcalle' => $tcalle,
-					'bco_ent' => $bco_ent,'bco_suc' => $bco_suc,'domi' => $domi,'tel' => $tel,
-					'resp' => $resp, 'sec_id' => $sec_id, 'part_id' => $part_id, 'nropart' => $nropart, 'part_nom' => $part_nom,
-					'part_id2' => $part_id2, 'nropart2' => $nropart2, 'part_nom2' => $part_nom2, 'part_id3' => $part_id3, 'nropart3' => $nropart3, 'part_nom3' => $part_nom3,
-					'consulta' => $consulta
-				]);
-
-    }
-
-    public function actionAuxeditredirect($t) {
-
-    	if(isset($_GET['mensaje'])) $mensaje = $_GET['mensaje'];
-    	if(isset($_GET['consulta'])) $consulta = $_GET['consulta'];
-
-    	return $this->redirect(['auxedit', 't' => $t,'mensaje'=>$mensaje,'consulta'=>$consulta]);
-    }
-
-
-/***************************************  REPORTES PDF  ****************************************************/
-
-    public function actionPdflist($format = 'A4-P') {
-
-      	if (!isset(Yii::$app->session['proceso_asig']) or !utb::getExisteProceso(Yii::$app->session['proceso_asig']))
-      		return $this->render('nopermitido');
-
-      	$pdf = Yii::$app->pdf;
-      	if (strtoupper($format) != 'A4-P') $pdf->format = strtoupper($format);
-
-      	$session= Yii::$app->session;
-      	$session->open();
-
-      	$columnas= $session->get('columns', []);
-      	$sql= $session->get('sql', 'Select 1');
-      	$titulo= $session->get('titulo', '');
-      	$condicion= $session->get('condicion', '');
-
-      	$dataProvider= new SqlDataProvider(['sql' => $sql,'totalCount' => 1000,'pagination'=> ['pageSize'=>1000,],]);
-
-      	$session->close();
-
-        $pdf->marginTop = '30px';
-		$pdf->content = $this->renderPartial('//reportes/reportelist', ['columnas' => $columnas, 'provider' => $dataProvider, 'titulo' => $titulo, 'condicion' => $condicion]);
-
-		return $pdf->render();
-    }
-
-/***************************************  EXPORTAR  ****************************************************/
-
-    public function actionExportar(){
-
-		if (!isset(Yii::$app->session['proceso_asig']) or !utb::getExisteProceso(Yii::$app->session['proceso_asig']))
-      		return $this->render('nopermitido');
-
-      	$array2 = [];
-		if ( isset(Yii::$app->session['query']) )
-			$array = Yii::$app->session['query']->createCommand()->queryAll();
-		else 	
-			$array = Yii::$app->db->createCommand(Yii::$app->session['sql'])->queryAll();
-			
-		if (count($array) == 0) return "<script>history.go(-1)</script>";
-
-		if (isset($_POST['rbFormato']))
-		{
-			$titulo = (isset($_POST['txTitulo']) ? $_POST['txTitulo'] : Yii::$app->session['titulo']);
-			$desc = (isset($_POST['txDetalle']) ? $_POST['txDetalle'] : Yii::$app->session['condicion']);
-
-			// DATOS PARA ARCHIVO DE TEXTO
-			// Delimitador de Campo
-			if ($_POST['rbDelimitador'] == 'T') $dc = chr(9); //Tab
-			if ($_POST['rbDelimitador'] == 'L') $dc = '|'; //Línea Vertical
-			if ($_POST['rbDelimitador'] == 'C') $dc = ','; //Coma
-			if ($_POST['rbDelimitador'] == 'P') $dc = ';'; // Punto y Coma
-			if ($_POST['rbDelimitador'] == 'O') $dc = $_POST['txOtroDelim']; // Otro
-
-			// Separador de Fila
-			if ($_POST['rbSepFila'] == 'LF') $sf = chr(10);
-			if ($_POST['rbSepFila'] == 'CR') $sf = chr(13);
-
-			// Si se incluye Fila de Título
-			$it = (isset ($_POST['ckIncTitulo']) && $_POST['ckIncTitulo'] == 1 ? $_POST['ckIncTitulo'] : 0);
-
-			$LineaT = ''; // Titulo del Archivo txt
-			$Linea = ''; // Cuerpo del Archivo txt
-			// FIN DATOS PARA ARCHIVO DE TEXTO
-
-
-			$i=0;
-			$tabla = ''; // tabla para exportar LibreOffice
-			$tablaT = '<tr>'; // encabezado de las columnas a exportar LibreOffice
-			foreach($array as $item)
-			{
-				if ($_POST['rbFormato'] == 'L') $tabla .= "<tr>";
-				foreach($item as $clave => $valor)
-				{
-				  for ($j=0; $j<count(Yii::$app->session['columns']);$j++)
-				  {
-				  	if (Yii::$app->session['columns'][$j]['attribute'] == $clave)
-				  	{
-				  		// archivo de texto
-				  		if ($_POST['rbFormato'] == 'T')
-						{
-							// si se incluye título, genero la línea con el mismo
-							if ($it == 1  and $i == 0) $LineaT .= Yii::$app->session['columns'][$j]['label'].$dc;
-							$Linea .= $valor.$dc;
-						}
-				  		// archivo de excel
-				  		if ($_POST['rbFormato'] == 'E') $array2[Yii::$app->session['columns'][$j]['label']] = $valor;
-
-				  		// archivo de libre office
-				  		if ($_POST['rbFormato'] == 'L' and $i == 0) $tablaT .= "<td>".Yii::$app->session['columns'][$j]['label']."</td>";
-				  		if ($_POST['rbFormato'] == 'L') $tabla .= "<td>".$valor."</td>";
-				  	}
-				  }
-				}
-
-				if ($_POST['rbFormato'] == 'E') $exportar[$i] = $array2;
-				if ($_POST['rbFormato'] == 'T' and $Linea != '') $Linea .= $sf;
-				if ($_POST['rbFormato'] == 'L') $tabla .= "</tr>";
-				$i += 1;
-			}
-			$tablaT .= '</tr>';
-			$tabla = '<table>'.$tablaT.$tabla.'</table>';
-
-			unset($array);
-
-			if ($_POST['rbFormato'] == 'L') // libreoffice
-			{
-				header("Content-type: application/vnd.oasis.opendocument.spreadsheet");
-		        header("Content-Disposition: attachment; filename=\"$titulo.ods\";" );
-
-				print $tabla;
-			}
-			if ($_POST['rbFormato'] == 'E') // excel
-			{
-				$excel_data = Export2ExcelBehavior::excelDataFormat($exportar); // obtengo los datos del array
-				$excel_title = $excel_data['excel_title']; // indico los títulos de las celdas según las claves del array
-				$excel_ceils = $excel_data['excel_ceils']; // indico los datos de las celdas
-
-				$excel_content = [
-				    [
-				        'sheet_name' => 'Listado', // Nombre de pestaña de la hoja de cálculo
-					    'sheet_title' => $excel_title,
-					    'ceils' => $excel_ceils,
-					    'headerColor' => Export2ExcelBehavior::getCssClass("header"),
-					],
-				];
-
-				$excel_props = [
-					'creator' => Yii::$app->param->muni_name,
-			        'title' => $titulo,
-			        'subject' => '',
-			        'desc' => $desc,
-			        'keywords' => '',
-			        'category' => ''
-        		];
-
-		        $this->export2excel($excel_content, $titulo, $excel_props); // parm1: contenido del excel, parm2:nombre del archivo
-
-
-			}
-			if ($_POST['rbFormato'] == 'T') // archivo de texto
-			{
-				if ($LineaT != '') $LineaT .= $sf;
-				$Linea = $LineaT.$Linea;
-
-				header("Content-Type: application/force-download");
-		        header("Content-Disposition: attachment; filename=\"$titulo.txt\";" );
-
-				print $Linea;
-			}
-		}
-    }
-
 
     /**
-     * Genera un pdf como reporte
-     *
-     * @param Array $columnas Arreglo de columnas con el formato valido para un DataProvider.
-     * @param string $sql Codigo SQL a ejecutar para obtener los datos que contendra el DataProvider.
-     * @param string $titulo Titulo del documento.
-     * @param string $condicion Condicion que cumplen los registros que se estan mostrando. Esta parametro solamente se utilizara para mostrarselo al usuario.
-     * @param
+     * Edición de tablas auxiliares
+     * @param int $t ID de la tabla auxiliar
+     * @return string|Response
+     * @throws NotFoundHttpException
      */
-    public static function imprimirReporte($columnas, $sql, $titulo, $condicion, $formato= 'A4-P'){
+    public function actionAuxedit($t)
+    {
+        $t = intval($t);
+        if (!$t) {
+            throw new BadRequestHttpException('Parámetro t inválido');
+        }
 
+        $model = tablaAux::findOne($t);
+        if (!$model) {
+            throw new NotFoundHttpException('Tabla auxiliar no encontrada');
+        }
 
-    	if (!isset(Yii::$app->session['proceso_asig']) or !utb::getExisteProceso(Yii::$app->session['proceso_asig']))
-      		return $this->render('nopermitido');
+        $consulta = 1; // Modo consulta por defecto
+        $error = '';
+        $mensaje = '';
+        
+        // Variables para partidas
+        $part_nom = $part_nom2 = $part_nom3 = '';
+        $nropart = $nropart2 = $nropart3 = '';
+        
+        // Procesar formulario si se envió
+        if (Yii::$app->request->isPost) {
+            $consulta = Yii::$app->request->post('txAccion', 1);
+            $error = $this->procesarFormularioAux($model, $t, $consulta);
+            
+            if ($error === '') {
+                $mensaje = ($consulta == 2) ? 'delete' : 'grabado';
+                return $this->redirect(['auxeditredirect', 't' => $t, 'mensaje' => $mensaje, 'consulta' => $consulta]);
+            }
+        }
 
-      	$pdf = Yii::$app->pdf;
-      	if (strtoupper($formato) != 'A4-P') $pdf->format = strtoupper($formato);
+        // Configurar datos de la tabla
+        $this->configurarTablaAux($model, $t);
+        $tabla = $this->cargarDatosTabla($model, $t);
+        
+        // Manejar PJAX para partidas
+        $this->manejarPjaxPartidas($part_id, $part_nom, $nropart, $part_id2, $part_nom2, $nropart2, $part_id3, $part_nom3, $nropart3);
+        
+        // Inicializar variables si no hay error
+        if ($error === '') {
+            $this->inicializarVariablesFormulario($cod, $nombre, $tercercampo, $tcalle, $bco_ent, $bco_suc, $domi, $tel, $resp, $sec_id, $part_id, $part_id2, $part_id3);
+        }
 
-      	$dataProvider= new SqlDataProvider(['sql' => $sql,'totalCount' => 1000,'pagination'=> ['pageSize'=>1000,],]);
-
-        $pdf->content = Yii::$app->controller->renderPartial('//reportes/reportelist', ['columnas' => $columnas, 'provider' => $dataProvider, 'titulo' => $titulo, 'condicion' => $condicion, 'totales' => $totales]);
-
-		return $pdf->render();
-
+        $url = $model->link ?: 'auxedit';
+        
+        return $this->render('//taux/' . $url, [
+            'model' => $model,
+            'tabla' => $tabla,
+            'error' => $error,
+            'mensaje' => $mensaje,
+            'cod' => $cod ?? '',
+            'nombre' => $nombre ?? '',
+            'tercercampo' => $tercercampo ?? '',
+            'tcalle' => $tcalle ?? 0,
+            'bco_ent' => $bco_ent ?? '',
+            'bco_suc' => $bco_suc ?? '',
+            'domi' => $domi ?? '',
+            'tel' => $tel ?? '',
+            'resp' => $resp ?? '',
+            'sec_id' => $sec_id ?? 0,
+            'part_id' => $part_id ?? 0,
+            'nropart' => $nropart,
+            'part_nom' => $part_nom,
+            'part_id2' => $part_id2 ?? 0,
+            'nropart2' => $nropart2,
+            'part_nom2' => $part_nom2,
+            'part_id3' => $part_id3 ?? 0,
+            'nropart3' => $nropart3,
+            'part_nom3' => $part_nom3,
+            'consulta' => $consulta
+        ]);
     }
-	
+
+    /**
+     * Redirección después de editar tabla auxiliar
+     * @param int $t
+     * @return Response
+     */
+    public function actionAuxeditredirect($t)
+    {
+        $mensaje = Yii::$app->request->get('mensaje', '');
+        $consulta = Yii::$app->request->get('consulta', 1);
+        
+        return $this->redirect(['auxedit', 't' => $t, 'mensaje' => $mensaje, 'consulta' => $consulta]);
+    }
+
+    /***************************************  REPORTES PDF  ****************************************************/
+
+    /**
+     * Generar reporte PDF
+     * @param string $format Formato del PDF
+     * @return mixed
+     */
+    public function actionPdflist($format = 'A4-P')
+    {
+        if (!isset(Yii::$app->session['proceso_asig']) || !utb::getExisteProceso(Yii::$app->session['proceso_asig'])) {
+            return $this->render('nopermitido');
+        }
+
+        $pdf = Yii::$app->pdf;
+        if (strtoupper($format) !== 'A4-P') {
+            $pdf->format = strtoupper($format);
+        }
+
+        $session = Yii::$app->session;
+        $columnas = $session->get('columns', []);
+        $sql = $session->get('sql', 'SELECT 1');
+        $titulo = $session->get('titulo', '');
+        $condicion = $session->get('condicion', '');
+
+        $dataProvider = new SqlDataProvider([
+            'sql' => $sql,
+            'totalCount' => 1000,
+            'pagination' => ['pageSize' => 1000],
+        ]);
+
+        $pdf->marginTop = '30px';
+        $pdf->content = $this->renderPartial('//reportes/reportelist', [
+            'columnas' => $columnas,
+            'provider' => $dataProvider,
+            'titulo' => $titulo,
+            'condicion' => $condicion
+        ]);
+
+        return $pdf->render();
+    }
+
+    /***************************************  EXPORTAR  ****************************************************/
+
+    /**
+     * Exportar datos a diferentes formatos
+     * @return string|void
+     */
+    public function actionExportar()
+    {
+        if (!isset(Yii::$app->session['proceso_asig']) || !utb::getExisteProceso(Yii::$app->session['proceso_asig'])) {
+            return $this->render('nopermitido');
+        }
+
+        // Obtener datos
+        if (isset(Yii::$app->session['query'])) {
+            $array = Yii::$app->session['query']->createCommand()->queryAll();
+        } else {
+            $array = Yii::$app->db->createCommand(Yii::$app->session['sql'])->queryAll();
+        }
+
+        if (empty($array)) {
+            Yii::$app->session->setFlash('warning', 'No hay datos para exportar');
+            return $this->goBack();
+        }
+
+        if (Yii::$app->request->isPost && Yii::$app->request->post('rbFormato')) {
+            $this->procesarExportacion($array);
+        }
+
+        return $this->render('exportar', ['count' => count($array)]);
+    }
+
+    /**
+     * Generar reporte estático
+     * @param array $columnas
+     * @param string $sql
+     * @param string $titulo
+     * @param string $condicion
+     * @param string $formato
+     * @return mixed
+     */
+    public static function imprimirReporte($columnas, $sql, $titulo, $condicion, $formato = 'A4-P')
+    {
+        if (!isset(Yii::$app->session['proceso_asig']) || !utb::getExisteProceso(Yii::$app->session['proceso_asig'])) {
+            return Yii::$app->controller->render('nopermitido');
+        }
+
+        $pdf = Yii::$app->pdf;
+        if (strtoupper($formato) !== 'A4-P') {
+            $pdf->format = strtoupper($formato);
+        }
+
+        $dataProvider = new SqlDataProvider([
+            'sql' => $sql,
+            'totalCount' => 1000,
+            'pagination' => ['pageSize' => 1000],
+        ]);
+
+        $pdf->content = Yii::$app->controller->renderPartial('//reportes/reportelist', [
+            'columnas' => $columnas,
+            'provider' => $dataProvider,
+            'titulo' => $titulo,
+            'condicion' => $condicion
+        ]);
+
+        return $pdf->render();
+    }
+
+    /***************************************  MÉTODOS PRIVADOS  ****************************************************/
+
+    /**
+     * Procesar formulario de tabla auxiliar
+     * @param tablaAux $model
+     * @param int $t
+     * @param int $consulta
+     * @return string
+     */
+    private function procesarFormularioAux($model, $t, $consulta)
+    {
+        $request = Yii::$app->request;
+        $error = '';
+
+        if ($model->link === '') {
+            // Tablas comunes
+            $cod = $request->post('txCod', 0);
+            $nombre = $request->post('txNombre', '');
+            $tercercampo = $request->post('txTercerCampo', 0);
+
+            if ($consulta != 2) {
+                $error = $model->grabarTablaAux($consulta, $cod, $nombre, $tercercampo);
+            } else {
+                $error = $model->borrarTablaAux($cod);
+            }
+        } else {
+            // Tablas con páginas específicas
+            $error = $this->procesarTablasEspeciales($model, $t, $consulta, $request);
+        }
+
+        return $error;
+    }
+
+    /**
+     * Procesar tablas auxiliares especiales
+     * @param tablaAux $model
+     * @param int $t
+     * @param int $consulta
+     * @param \yii\web\Request $request
+     * @return string
+     */
+    private function procesarTablasEspeciales($model, $t, $consulta, $request)
+    {
+        $error = '';
+        $cod = $request->post('txCod', 0);
+        $nombre = $request->post('txNombre', '');
+
+        switch ($t) {
+            case 130: // domi_calle
+                $tcalle = $request->post('tipo', 0);
+                if ($consulta != 2) {
+                    $error = $model->grabarTablaAuxDomiCalle($consulta, $cod, $nombre, $tcalle);
+                }
+                break;
+                
+            case 80: // banco_suc
+                $bco_ent = $request->post('bco_ent', 0);
+                $bco_suc = $request->post('bco_suc', 0);
+                $domi = $request->post('domi', 0);
+                $tel = $request->post('tel', 0);
+                
+                if ($consulta != 2) {
+                    $error = $model->grabarTablaAuxBancoSuc($consulta, $bco_ent, $bco_suc, $nombre, $domi, $tel);
+                } else {
+                    $error = $model->borrarTablaAuxBancoSuc($bco_ent, $bco_suc);
+                }
+                break;
+                
+            case 133: // muni_oficina
+                $resp = $request->post('resp', 0);
+                $sec_id = $request->post('sec_id', 0);
+                $part_id = $request->post('part_id', 0);
+                
+                if ($consulta != 2) {
+                    $error = $model->grabarTablaAuxOficina($consulta, $cod, $nombre, $resp, $sec_id, $part_id);
+                }
+                break;
+                
+            case 139: // muni_sec
+                $part_id = $request->post('part_id', 0);
+                $part_id2 = $request->post('part_id2', 0);
+                $part_id3 = $request->post('part_id3', 0);
+                
+                if ($consulta != 2) {
+                    $error = $model->grabarTablaAuxSecretaria($consulta, $cod, $nombre, $part_id, $part_id2, $part_id3);
+                }
+                break;
+        }
+
+        // Borrado común para tablas especiales (excepto banco_suc)
+        if ($consulta == 2 && !in_array($t, [80, 128])) {
+            $error = $model->borrarTablaAux($cod);
+        }
+
+        return $error;
+    }
+
+    /**
+     * Configurar modelo de tabla auxiliar
+     * @param tablaAux $model
+     * @param int $t
+     */
+    private function configurarTablaAux($model, $t)
+    {
+        if ($model->link === '') {
+            $model->nombrelong = tablaAux::GetCampoLong($model->nombre, 'nombre');
+            $model->codlong = ($model->tcod == 'N' ? 4 : tablaAux::GetCampoLong($model->nombre, 'cod'));
+            if ($t == 211) {
+                $model->codlong = 6;
+            }
+            $model->CargarTercerCampo();
+        }
+    }
+
+    /**
+     * Cargar datos de la tabla
+     * @param tablaAux $model
+     * @param int $t
+     * @return array
+     */
+    private function cargarDatosTabla($model, $t)
+    {
+        if ($model->link === '') {
+            return tablaAux::CargarTabla($model->nombre, $model->tercercamponom);
+        }
+
+        switch ($t) {
+            case 37:
+                return tablaAux::CargarTabla('cem_cuadro');
+            case 133:
+                return (new tablaAux())->CargarTablaOficina();
+            case 139:
+                return (new tablaAux())->CargarTablaSecretaria();
+            default:
+                return tablaAux::CargarTabla($model->nombre);
+        }
+    }
+
+    /**
+     * Manejar solicitudes PJAX para partidas
+     * @param int $part_id
+     * @param string $part_nom
+     * @param string $nropart
+     * @param int $part_id2
+     * @param string $part_nom2
+     * @param string $nropart2
+     * @param int $part_id3
+     * @param string $part_nom3
+     * @param string $nropart3
+     */
+    private function manejarPjaxPartidas(&$part_id, &$part_nom, &$nropart, &$part_id2, &$part_nom2, &$nropart2, &$part_id3, &$part_nom3, &$nropart3)
+    {
+        $request = Yii::$app->request;
+        $pjax = $request->get('_pjax', '');
+        $anio = date('Y');
+        
+        if ($pjax === '#pjaxCambiaPartida') {
+            $nropart = $request->get('partida', 0);
+            list($part_id, $part_nom) = $this->buscarPartida($nropart, $anio);
+        } elseif ($pjax === '#pjaxCambiaPartida2') {
+            $nropart2 = $request->get('partida2', 0);
+            list($part_id2, $part_nom2) = $this->buscarPartida($nropart2, $anio);
+        } elseif ($pjax === '#pjaxCambiaPartida3') {
+            $nropart3 = $request->get('partida3', 0);
+            list($part_id3, $part_nom3) = $this->buscarPartida($nropart3, $anio);
+        }
+    }
+
+    /**
+     * Buscar información de partida
+     * @param string $nropart
+     * @param int $anio
+     * @return array
+     */
+    private function buscarPartida($nropart, $anio)
+    {
+        $cond = 'tiene_hijo=false AND anio = ' . $anio;
+        
+        if (strpos($nropart, '.') > -1) {
+            $cond .= " and (formato = '" . $nropart . "' OR formatoaux = '" . $nropart . "')";
+        } else {
+            $cond .= " and (nropart = " . intval($nropart) . " or part_id=" . intval($nropart) . ")";
+        }
+        
+        $part_id = intval(utb::getCampo("fin.v_part", $cond, "part_id"));
+        $part_nom = utb::getCampo("fin.v_part", "part_id=" . $part_id, "nombre");
+        
+        return [$part_id, $part_nom];
+    }
+
+    /**
+     * Inicializar variables del formulario
+     */
+    private function inicializarVariablesFormulario(&$cod, &$nombre, &$tercercampo, &$tcalle, &$bco_ent, &$bco_suc, &$domi, &$tel, &$resp, &$sec_id, &$part_id, &$part_id2, &$part_id3)
+    {
+        $cod = $nombre = $tercercampo = $bco_ent = $bco_suc = $domi = $tel = $resp = '';
+        $tcalle = $sec_id = $part_id = $part_id2 = $part_id3 = 0;
+    }
+
+    /**
+     * Procesar exportación de datos
+     * @param array $array
+     */
+    private function procesarExportacion($array)
+    {
+        $request = Yii::$app->request;
+        $formato = $request->post('rbFormato');
+        $titulo = $request->post('txTitulo', Yii::$app->session->get('titulo', 'Exportación'));
+        $desc = $request->post('txDetalle', Yii::$app->session->get('condicion', ''));
+        
+        switch ($formato) {
+            case 'E': // Excel
+                $this->exportarExcel($array, $titulo, $desc);
+                break;
+            case 'L': // LibreOffice
+                $this->exportarLibreOffice($array, $titulo);
+                break;
+            case 'T': // Texto
+                $this->exportarTexto($array, $titulo, $request);
+                break;
+        }
+    }
+
+    /**
+     * Exportar a Excel
+     * @param array $array
+     * @param string $titulo
+     * @param string $desc
+     */
+    private function exportarExcel($array, $titulo, $desc)
+    {
+        $exportar = [];
+        foreach ($array as $i => $item) {
+            $fila = [];
+            foreach ($item as $clave => $valor) {
+                foreach (Yii::$app->session['columns'] as $column) {
+                    if ($column['attribute'] === $clave) {
+                        $fila[$column['label']] = $valor;
+                        break;
+                    }
+                }
+            }
+            $exportar[$i] = $fila;
+        }
+
+        $excel_data = Export2ExcelBehavior::excelDataFormat($exportar);
+        $excel_content = [[
+            'sheet_name' => 'Listado',
+            'sheet_title' => $excel_data['excel_title'],
+            'ceils' => $excel_data['excel_ceils'],
+            'headerColor' => Export2ExcelBehavior::getCssClass("header"),
+        ]];
+
+        $excel_props = [
+            'creator' => Yii::$app->params['muni_name'] ?? 'ISURGOB',
+            'title' => $titulo,
+            'subject' => '',
+            'desc' => $desc,
+            'keywords' => '',
+            'category' => ''
+        ];
+
+        $this->export2excel($excel_content, $titulo, $excel_props);
+    }
+
+    /**
+     * Exportar a LibreOffice
+     * @param array $array
+     * @param string $titulo
+     */
+    private function exportarLibreOffice($array, $titulo)
+    {
+        $tabla = '<table>';
+        $tablaT = '<tr>';
+        
+        // Encabezados
+        foreach (Yii::$app->session['columns'] as $column) {
+            $tablaT .= '<td>' . $column['label'] . '</td>';
+        }
+        $tablaT .= '</tr>';
+        
+        // Datos
+        foreach ($array as $item) {
+            $tabla .= '<tr>';
+            foreach ($item as $clave => $valor) {
+                foreach (Yii::$app->session['columns'] as $column) {
+                    if ($column['attribute'] === $clave) {
+                        $tabla .= '<td>' . $valor . '</td>';
+                        break;
+                    }
+                }
+            }
+            $tabla .= '</tr>';
+        }
+        $tabla = $tabla . '</table>';
+
+        header("Content-type: application/vnd.oasis.opendocument.spreadsheet");
+        header("Content-Disposition: attachment; filename=\"$titulo.ods\";");
+        echo $tablaT . $tabla;
+        exit;
+    }
+
+    /**
+     * Exportar a texto
+     * @param array $array
+     * @param string $titulo
+     * @param \yii\web\Request $request
+     */
+    private function exportarTexto($array, $titulo, $request)
+    {
+        // Configurar delimitadores
+        $delimitadores = [
+            'T' => chr(9), // Tab
+            'L' => '|',    // Línea Vertical
+            'C' => ',',    // Coma
+            'P' => ';',    // Punto y Coma
+            'O' => $request->post('txOtroDelim', ',')
+        ];
+        
+        $separadores = [
+            'LF' => chr(10),
+            'CR' => chr(13)
+        ];
+        
+        $dc = $delimitadores[$request->post('rbDelimitador', 'C')];
+        $sf = $separadores[$request->post('rbSepFila', 'LF')];
+        $incluirTitulo = $request->post('ckIncTitulo', 0);
+        
+        $contenido = '';
+        
+        // Agregar títulos si se solicita
+        if ($incluirTitulo) {
+            $titulos = [];
+            foreach (Yii::$app->session['columns'] as $column) {
+                $titulos[] = $column['label'];
+            }
+            $contenido .= implode($dc, $titulos) . $sf;
+        }
+        
+        // Agregar datos
+        foreach ($array as $item) {
+            $fila = [];
+            foreach ($item as $clave => $valor) {
+                foreach (Yii::$app->session['columns'] as $column) {
+                    if ($column['attribute'] === $clave) {
+                        $fila[] = $valor;
+                        break;
+                    }
+                }
+            }
+            $contenido .= implode($dc, $fila) . $sf;
+        }
+        
+        header("Content-Type: application/force-download");
+        header("Content-Disposition: attachment; filename=\"$titulo.txt\";");
+        echo $contenido;
+        exit;
+    }
 }
