@@ -1,73 +1,307 @@
-## ISURGOB
+# ğŸ›ï¸ Sistema de AdministraciÃ³n Municipal (SAM) - VersiÃ³n Modernizada
 
-### Sistema Integrado de Gobierno
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+[![PHP Version](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
+[![Yii Framework](https://img.shields.io/badge/Yii-2.0%2B-green.svg)](https://www.yiiframework.com)
+[![EasyPanel Compatible](https://img.shields.io/badge/EasyPanel-Compatible-orange.svg)](https://easypanel.io)
+
+## ğŸ“‹ DescripciÃ³n
+
+Sistema integral de administraciÃ³n municipal modernizado y optimizado para despliegue en contenedores. Compatible con **EasyPanel**, **Traefik**, y entornos de nube modernos.
+
+### ğŸš€ CaracterÃ­sticas Principales
+
+- **ğŸ—ï¸ Arquitectura Modular**: Tres mÃ³dulos principales (SAM, SAMSEG, SAMTRIB)
+- **ğŸ³ Containerizado**: Listo para Docker y EasyPanel
+- **ğŸ”’ Seguro**: ConfiguraciÃ³n de seguridad moderna con HTTPS
+- **ğŸ“± Responsivo**: Interfaz adaptable a dispositivos mÃ³viles
+- **âš¡ Optimizado**: Rendimiento mejorado y caching inteligente
+- **ğŸ” Monitoreo**: Health checks y diagnÃ³sticos integrados
+
+## ğŸ› ï¸ TecnologÃ­as
+
+- **Backend**: PHP 8.1+, Yii Framework 2.0
+- **Base de Datos**: PostgreSQL
+- **Frontend**: Bootstrap 4, jQuery
+- **Contenedores**: Docker, EasyPanel
+- **Proxy**: Traefik compatible
+- **Cache**: Redis (opcional)
+
+## ğŸ“¦ MÃ³dulos del Sistema
+
+### ğŸ›ï¸ SAM (Sistema de AdministraciÃ³n Municipal)
+- GestiÃ³n de expedientes
+- AdministraciÃ³n de personal
+- Control de inventarios
+- Reportes y estadÃ­sticas
+
+### ğŸ›¡ï¸ SAMSEG (Seguridad)
+- Control de acceso
+- GestiÃ³n de usuarios
+- AuditorÃ­a de sistema
+- Perfiles y permisos
+
+### ğŸ’° SAMTRIB (Tributario)
+- GestiÃ³n tributaria
+- LiquidaciÃ³n de impuestos
+- Control de contribuyentes
+- FacturaciÃ³n electrÃ³nica
+
+## ğŸš€ InstalaciÃ³n RÃ¡pida
+
+### Usando EasyPanel (Recomendado)
+
+1. **Clonar el repositorio**:
+   ```bash
+   git clone https://github.com/auruxproject/sam-sistema-modernizado.git
+   cd sam-sistema-modernizado
+   ```
+
+2. **Configurar variables de entorno**:
+   ```bash
+   cp .env.example .env
+   # Editar .env con tus configuraciones
+   ```
+
+3. **Desplegar en EasyPanel**:
+   - Crear nueva aplicaciÃ³n en EasyPanel
+   - Conectar repositorio GitHub
+   - Configurar variables de entorno
+   - Desplegar automÃ¡ticamente
+
+### Usando Docker
+
+```bash
+# Construir imagen
+docker build -t sam-sistema .
+
+# Ejecutar contenedor
+docker run -d \
+  --name sam-app \
+  -p 80:80 \
+  -e DB_HOST=your-db-host \
+  -e DB_NAME=sam_db \
+  -e DB_USERNAME=sam_user \
+  -e DB_PASSWORD=your-password \
+  sam-sistema
+```
+
+## âš™ï¸ ConfiguraciÃ³n
+
+### Variables de Entorno Principales
+
+```bash
+# AplicaciÃ³n
+APP_ENV=production
+APP_DEBUG=false
+COOKIE_VALIDATION_KEY=your-unique-key
+
+# Base de Datos
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=sam_db
+DB_USERNAME=sam_user
+DB_PASSWORD=secure-password
+
+# EasyPanel/Traefik
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+TRUSTED_HOSTS=*.easypanel.host,localhost
+FORCE_HTTPS=true
+```
+
+## ğŸ” Health Checks y DiagnÃ³stico
+
+El sistema incluye herramientas de diagnÃ³stico integradas:
+
+- **`/health.php`** - Health check para EasyPanel
+- **`/debug.php`** - DiagnÃ³stico completo del sistema
+- **`/test.php`** - VerificaciÃ³n de componentes
+
+### Endpoints de Monitoreo
+
+- `GET /health` - Estado general del sistema
+- `GET /status` - Estado detallado
+- `GET /ping` - VerificaciÃ³n bÃ¡sica de conectividad
+
+## ğŸ“ Estructura del Proyecto
+
+```
+sam-sistema-modernizado/
+â”œâ”€â”€ ğŸ“ config/           # Configuraciones
+â”œâ”€â”€ ğŸ“ controllers/      # Controladores MVC
+â”œâ”€â”€ ğŸ“ views/           # Vistas y layouts
+â”œâ”€â”€ ğŸ“ web/             # Assets pÃºblicos
+â”œâ”€â”€ ğŸ“ runtime/         # Archivos temporales
+â”œâ”€â”€ ğŸ“ sam/             # MÃ³dulo SAM
+â”œâ”€â”€ ğŸ“ samseg/          # MÃ³dulo SAMSEG
+â”œâ”€â”€ ğŸ“ samtrib/         # MÃ³dulo SAMTRIB
+â”œâ”€â”€ ğŸ“ db/              # Scripts de base de datos
+â”œâ”€â”€ ğŸ“„ health.php       # Health check
+â”œâ”€â”€ ğŸ“„ debug.php        # DiagnÃ³stico
+â”œâ”€â”€ ğŸ“„ Dockerfile       # ConfiguraciÃ³n Docker
+â””â”€â”€ ğŸ“„ docker-compose.yml
+```
+
+## ğŸ”§ Desarrollo
+
+### Requisitos
+
+- PHP 8.1 o superior
+- PostgreSQL 12+
+- Composer
+- Node.js (para assets)
+
+### ConfiguraciÃ³n Local
+
+```bash
+# Instalar dependencias
+composer install
+
+# Configurar base de datos
+psql -U postgres -c "CREATE DATABASE sam_db;"
+psql -U postgres sam_db < db/a-pgbackup_sam_logico-2019-05.sql
+
+# Configurar permisos
+chmod -R 755 runtime/ web/assets/
+
+# Servidor de desarrollo
+php -S localhost:8000 -t web
+```
+
+## ğŸš€ Despliegue en ProducciÃ³n
+
+### Lista de VerificaciÃ³n
+
+- [ ] âœ… Variables de entorno configuradas
+- [ ] âœ… Base de datos PostgreSQL disponible
+- [ ] âœ… Certificados SSL configurados
+- [ ] âœ… Permisos de directorios correctos
+- [ ] âœ… Health checks funcionando
+- [ ] âœ… Logs configurados
+- [ ] âœ… Backup programado
+
+### Monitoreo Post-Despliegue
+
+1. Verificar health check: `https://tu-dominio/health.php`
+2. Revisar diagnÃ³stico: `https://tu-dominio/debug.php`
+3. Comprobar logs de aplicaciÃ³n
+4. Validar conectividad de base de datos
+
+## ğŸ“Š CaracterÃ­sticas TÃ©cnicas
+
+### Seguridad
+- ğŸ”’ HTTPS obligatorio
+- ğŸ›¡ï¸ Headers de seguridad configurados
+- ğŸ” ValidaciÃ³n CSRF
+- ğŸš« ProtecciÃ³n XSS
+- ğŸ”‘ GestiÃ³n segura de sesiones
+
+### Rendimiento
+- âš¡ Cache de aplicaciÃ³n
+- ğŸ—œï¸ CompresiÃ³n gzip
+- ğŸ“¦ Assets minificados
+- ğŸ”„ Lazy loading
+- ğŸ“ˆ OptimizaciÃ³n de consultas
+
+### Compatibilidad
+- ğŸ³ Docker nativo
+- â˜ï¸ EasyPanel optimizado
+- ğŸ”€ Traefik compatible
+- ğŸ“± Responsive design
+- ğŸŒ Multi-idioma
+
+## ğŸ¤ ContribuciÃ³n
+
+1. Fork el proyecto
+2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit cambios (`git commit -am 'Agregar nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Crear Pull Request
+
+## ğŸ“ Changelog
+
+### v2.0.0 (2024-01-08)
+- âœ¨ ModernizaciÃ³n completa del sistema
+- ğŸ³ Compatibilidad con EasyPanel y Docker
+- ğŸ”’ Mejoras de seguridad
+- ğŸ“± Interfaz responsiva
+- ğŸ” Health checks integrados
+- âš¡ Optimizaciones de rendimiento
+
+## ğŸ“„ Licencia
+
+Este proyecto estÃ¡ licenciado bajo la Licencia MIT - ver el archivo [LICENSE.md](LICENSE.md) para detalles.
+
+## ğŸ†˜ Soporte
+
+- ğŸ“§ **Email**: soporte@municipio.gov
+- ğŸ“– **DocumentaciÃ³n**: [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
+- ğŸ› **Issues**: [GitHub Issues](https://github.com/auruxproject/sam-sistema-modernizado/issues)
+- ğŸ’¬ **Discusiones**: [GitHub Discussions](https://github.com/auruxproject/sam-sistema-modernizado/discussions)
+
+## ğŸ† CrÃ©ditos
+
+Desarrollado con â¤ï¸ para la modernizaciÃ³n de la administraciÃ³n pÃºblica municipal.
+
 ---
-El ISURGOB (Sistema Integrado de Administración Municipal), comprende la sistematización de un conjunto de procesos Administrativos, Tributarios y Financieros.
 
-El Sistema Integrado de Gobierno esta basado en el concepto de código abierto entendido como un modelo de desarrollo de software basado en la colaboración abierta, enfocada en los beneficios prácticos (acceso al código fuente) para los gobiernos.
+**Sistema de AdministraciÃ³n Municipal (SAM)** - Transformando la gestiÃ³n municipal con tecnologÃ­a moderna.
 
-ISURGOB reúne la experiencia de software de un equipo de consultores especialista que ha desarrollado sistemas de administración tributaria y financiera para gobiernos en los últimos 25 años en el país y la región, actualizando constantemente la tecnología para obtener una de las herramientas más sólidas e integradas que se pueden encontrar en el mercado.
-
-Nuestro Sistema de Gestión Tributaria profundiza el aprovechamiento integral de las nuevas Tecnologías de la Información y la Comunicación (TICs), consolidando un modelo de gestión tributaria eficiente, ágil, productivo, seguro y transparente en las fases operativo/funcionales de la administración pública, para cumplir con eficacia las tareas cotidianas y fortalecer la relación con los contribuyentes y/o responsables.    
-
-Esto permite:
-- Mejor eficiencia en la obtención y aplicación de los Recursos Públicos.
-
-- La generación de información oportuna y confiable, indispensable para la toma de decisiones, sobre la situación de cada objeto imponible y contribuyente del Municipio y demás relaciones funcionales de la operatoria.
+## ISURGOB - InformaciÃ³n HistÃ³rica
 
 
 ### Subsistemas
 ---
-Está integrado por los siguientes SubSistemas:
+Estï¿½ integrado por los siguientes SubSistemas:
 
 - ISURGOB Tributario
 
-El Sistema de Gestión Tributaria es un complejo y avanzado conjunto de sistemas de información, totalmente integrados, diseñados para la gestión y administración, que funciona como una base integradora de gestión.
+El Sistema de Gestiï¿½n Tributaria es un complejo y avanzado conjunto de sistemas de informaciï¿½n, totalmente integrados, diseï¿½ados para la gestiï¿½n y administraciï¿½n, que funciona como una base integradora de gestiï¿½n.
 
-Se basa en el concepto de Contribuyente Único y Cuenta Corriente Única.
+Se basa en el concepto de Contribuyente ï¿½nico y Cuenta Corriente ï¿½nica.
 
-Entre los módulos que se incluyen podemos mencionar: administración de Contribuyentes y Objetos Imponibles, administración de Cuenta Corriente Única, emisión de Tasas periódicas, eventuales, Generación de Declaraciones Juradas de Actividades Comerciales, Manejo de Agentes de Retención y Percepción, generación de Facilidades y Planes de Pago, gestión de Cobranza on-line y off-line, Cumplimiento Fiscal, Ejecución Judicial y Servicios al Ciudadano.
+Entre los mï¿½dulos que se incluyen podemos mencionar: administraciï¿½n de Contribuyentes y Objetos Imponibles, administraciï¿½n de Cuenta Corriente ï¿½nica, emisiï¿½n de Tasas periï¿½dicas, eventuales, Generaciï¿½n de Declaraciones Juradas de Actividades Comerciales, Manejo de Agentes de Retenciï¿½n y Percepciï¿½n, generaciï¿½n de Facilidades y Planes de Pago, gestiï¿½n de Cobranza on-line y off-line, Cumplimiento Fiscal, Ejecuciï¿½n Judicial y Servicios al Ciudadano.
 
-A su vez permite la generación de diferentes reportes y comprobantes para el pago de las diferentes tasas y contribuciones que operan en el Organismo en base a las normativas vigentes.
+A su vez permite la generaciï¿½n de diferentes reportes y comprobantes para el pago de las diferentes tasas y contribuciones que operan en el Organismo en base a las normativas vigentes.
 (https://github.com/isurgob/isurgob/tree/master/docs/samtrib.gif)
 
 - ISURGOB Seguridad
 
-El Subsistema de Seguridad es el encargado de gestionar los usuarios, perfiles y permisos de acceso a los distintos Subsistemas. Además permite manejar los módulos de cada Subsistema. También dispone de algunas auditorías, en especial en lo que se refiere a control de acceso, accesos fallidos, blanqueos de clave, control de accesos múltiples, etc. 
-Físicamente de ubica en una carpeta distinta del Subsistema Tributario, aunque comparte algunas librerías comunes de todos los Subsistemas. 
-El Subsistema Tributario posee todos los módulos detallados de la Administración Tributaria. De acuerdo a los permisos del usuario definidos en el Subsistema de Seguridad se habilitan las opciones disponibles.
+El Subsistema de Seguridad es el encargado de gestionar los usuarios, perfiles y permisos de acceso a los distintos Subsistemas. Ademï¿½s permite manejar los mï¿½dulos de cada Subsistema. Tambiï¿½n dispone de algunas auditorï¿½as, en especial en lo que se refiere a control de acceso, accesos fallidos, blanqueos de clave, control de accesos mï¿½ltiples, etc. 
+Fï¿½sicamente de ubica en una carpeta distinta del Subsistema Tributario, aunque comparte algunas librerï¿½as comunes de todos los Subsistemas. 
+El Subsistema Tributario posee todos los mï¿½dulos detallados de la Administraciï¿½n Tributaria. De acuerdo a los permisos del usuario definidos en el Subsistema de Seguridad se habilitan las opciones disponibles.
 (https://github.com/isurgob/isurgob/tree/master/docs/samseg.gif)
 
-### Características del Sistema
+### Caracterï¿½sticas del Sistema
 ---
-La arquitectura de la solución posee las siguientes características:
+La arquitectura de la soluciï¿½n posee las siguientes caracterï¿½sticas:
 - Arquitectura Web Enabled
-- Patrón de diseño MVC
+- Patrï¿½n de diseï¿½o MVC
 - Interoperabilidad
 - Escalabilidad, Confiabilidad y Fiabilidad
-- Alto grado de Parametrización
-- Integracón con otros sistemas mediante el uso de WebServices
+- Alto grado de Parametrizaciï¿½n
+- Integracï¿½n con otros sistemas mediante el uso de WebServices
 
 
 ### Servicios
 ---
 Que es lo que hacemos y lo que brindamos
-- Múltiples canales de acceso
+- Mï¿½ltiples canales de acceso
 - Apoyo a la Infraestructura necesaria
-- Mejora en la recaudación
-- Sistema intuitivo y dinámico
+- Mejora en la recaudaciï¿½n
+- Sistema intuitivo y dinï¿½mico
 - Ajustes totalmente parametrizables
-- Entrenamiento y capacitación.
+- Entrenamiento y capacitaciï¿½n.
 
 
-### Guía de instalación
+### Guï¿½a de instalaciï¿½n
 ---
 1. Prerequisitos
--   Sistema Operativo de Servidor: preferentemente Linux Server kernel versión 4.4 o superior, distribuciones recomendadas Debian/Ubuntu
+-   Sistema Operativo de Servidor: preferentemente Linux Server kernel versiï¿½n 4.4 o superior, distribuciones recomendadas Debian/Ubuntu
 -	Base de Datos: PostgreSQL 9.4 o superior
 -	Servidor Web: Apache 2.4 o superior
 -	Lenguaje: PHP 7.0
--   Librerías PHP adicionales: 
+-   Librerï¿½as PHP adicionales: 
     -   php-mbstring
 	-   php-xml
 	-   php-mcrypt
@@ -76,67 +310,67 @@ Que es lo que hacemos y lo que brindamos
 	-   pdo-pgsql
 -   Ejemplo: $ sudo -E apt-get -yq --no-install-suggests --no-install-recommends install php7.0-xml php7.0-mbstring php7.0-mcrypt php7.0-gd php7.0-zip php7.0-pgsql
 
-2. Instalación de la Base de Datos
+2. Instalaciï¿½n de la Base de Datos
 -   Soporte para PostgreSQL.
 
-Para instalar las bases de datos es necesario cargar los scripts en las herramientas específicas de las bases de datos como psql o PgAdmin
+Para instalar las bases de datos es necesario cargar los scripts en las herramientas especï¿½ficas de las bases de datos como psql o PgAdmin
 
- -  Instalación en PostgreSQL
+ -  Instalaciï¿½n en PostgreSQL
  -  Abrir los script ubicados en la carpeta "db".
- -  Ejecutar mediante psql. El fichero Readme.txt contiene las instrucciones específicas.
+ -  Ejecutar mediante psql. El fichero Readme.txt contiene las instrucciones especï¿½ficas.
 
-3. Descarga e Instalación del Código
--   Descarga de código desde el Repositorio de github
+3. Descarga e Instalaciï¿½n del Cï¿½digo
+-   Descarga de cï¿½digo desde el Repositorio de github
     -   $ wget https://github.com/isurgob/isurgob/archive/master.zip
--   Descomprimir el código del paso anterior en el directorio de publicación de Apache
-    -   $ cd /var/www/html o similar según la distriución a utilizar.
+-   Descomprimir el cï¿½digo del paso anterior en el directorio de publicaciï¿½n de Apache
+    -   $ cd /var/www/html o similar segï¿½n la distriuciï¿½n a utilizar.
 	-   $ unzip master.zip.
 
 4. Puesta en Marcha
 Una vez instalado, tipear en su navegador Web http://ip_dns/sam.
 Primeros Pasos en la imagen: (https://github.com/isurgob/isurgob/tree/master/docs/ISURGOB-Instala.gif)
 
-5. Configuración Inicial
-En forma previa a la utilización de los módulos del Sistema, es necesario precargar los datos auxiliares y de configuración en función de las normativas propias del organismo.
-Cada municipio tendrá su propia reglamentación en materia de Tributos, Tasas, Contribuciones, Resoluciones y demás.
-Asimismo, las tipologías y categorizaciones respecto de los Objetos Imponibles y otros módulos son propias de cada organismo en particular y es importante su ingreso desde el área de configuraciones, cito en el encabezado de la página.
+5. Configuraciï¿½n Inicial
+En forma previa a la utilizaciï¿½n de los mï¿½dulos del Sistema, es necesario precargar los datos auxiliares y de configuraciï¿½n en funciï¿½n de las normativas propias del organismo.
+Cada municipio tendrï¿½ su propia reglamentaciï¿½n en materia de Tributos, Tasas, Contribuciones, Resoluciones y demï¿½s.
+Asimismo, las tipologï¿½as y categorizaciones respecto de los Objetos Imponibles y otros mï¿½dulos son propias de cada organismo en particular y es importante su ingreso desde el ï¿½rea de configuraciones, cito en el encabezado de la pï¿½gina.
 Accesos desde la barra superior del Sistema: (https://github.com/isurgob/isurgob/tree/master/docs/sam-config.jpg)
 
-6. Vinculación de ISURGOB Tributario con el GIS
+6. Vinculaciï¿½n de ISURGOB Tributario con el GIS
 
--   Web Service: La vinculación con otros sistemas se podrá llevar a cabo por medio de WebService.
--   Nomenclatura: La clave unívoca de todo Registro Gráfico se centra en la nomenclatura parcelaria.
--   Solicitud de Información: A partir de la identificación de una parcela en el GIS, se podrá invocar una función definida en el WebService de ISURGob Tributario para recuperar información alfanumérica a modo de consulta.
--   Desde el Formulario de consulta de inmueble, se dispondrá de link que permite el acceso al GIS. El acceso se realiza mediante URL, la cual se configura dentro del Módulo de Configuración. En la URL se envía como parámetro la Nomenclatura del inmueble a localizar.
--   Los métodos que se proveen son los siguientes:
-    a)	Alta, Baja y modificación unitaria de inmuebles:
-    b)	Actualización de Valuaciones: Permitirá actualizar la información asociada a las valuaciones de inmuebles y mejoras, incluyendo todos los elementos necesarios, tales como: superficie, zona, coeficiente, valor básico, categoría, etc. Este método será invocado por el Sistema de Catastro, ante un proceso de revalúo, ya sea parcial o total.
-    c)	Semáforo de deuda: Consistirá en un semáforo que indicará si se pueden realizar gestiones sobre un inmueble en el Sistema de Catastro, de acuerdo al estado de deuda del mismo, teniendo en cuenta los parámetros para determinar la misma. El Sistema Comarcal incluirá las llamadas a este “semáforo” cuando se inicien trámites que cambien el estado del inmueble (Planos de obra, declaraciones de mejoras, etc.)
--   Funciones y Aspectos Técnicos: (https://github.com/isurgob/isurgob/tree/master/docs/InterfacesGIS.pdf)
+-   Web Service: La vinculaciï¿½n con otros sistemas se podrï¿½ llevar a cabo por medio de WebService.
+-   Nomenclatura: La clave unï¿½voca de todo Registro Grï¿½fico se centra en la nomenclatura parcelaria.
+-   Solicitud de Informaciï¿½n: A partir de la identificaciï¿½n de una parcela en el GIS, se podrï¿½ invocar una funciï¿½n definida en el WebService de ISURGob Tributario para recuperar informaciï¿½n alfanumï¿½rica a modo de consulta.
+-   Desde el Formulario de consulta de inmueble, se dispondrï¿½ de link que permite el acceso al GIS. El acceso se realiza mediante URL, la cual se configura dentro del Mï¿½dulo de Configuraciï¿½n. En la URL se envï¿½a como parï¿½metro la Nomenclatura del inmueble a localizar.
+-   Los mï¿½todos que se proveen son los siguientes:
+    a)	Alta, Baja y modificaciï¿½n unitaria de inmuebles:
+    b)	Actualizaciï¿½n de Valuaciones: Permitirï¿½ actualizar la informaciï¿½n asociada a las valuaciones de inmuebles y mejoras, incluyendo todos los elementos necesarios, tales como: superficie, zona, coeficiente, valor bï¿½sico, categorï¿½a, etc. Este mï¿½todo serï¿½ invocado por el Sistema de Catastro, ante un proceso de revalï¿½o, ya sea parcial o total.
+    c)	Semï¿½foro de deuda: Consistirï¿½ en un semï¿½foro que indicarï¿½ si se pueden realizar gestiones sobre un inmueble en el Sistema de Catastro, de acuerdo al estado de deuda del mismo, teniendo en cuenta los parï¿½metros para determinar la misma. El Sistema Comarcal incluirï¿½ las llamadas a este ï¿½semï¿½foroï¿½ cuando se inicien trï¿½mites que cambien el estado del inmueble (Planos de obra, declaraciones de mejoras, etc.)
+-   Funciones y Aspectos Tï¿½cnicos: (https://github.com/isurgob/isurgob/tree/master/docs/InterfacesGIS.pdf)
 
 
 ### Arquitectura
 ---
-El modelo se enmarca en por lo menos dos principios de la gestión pública de la calidad: principio de continuidad en la prestación de servicios, que propone que los servicios públicos se prestarán de manera regular e ininterrumpida, previendo las medidas necesarias para evitar o minimizar los perjuicios que pudieran ocasionarle al ciudadano en las posibles suspensiones del servicio. Y el principio de evaluación permanente y mejora continua que propone que una gestión pública de calidad es aquella que contempla la evaluación permanente, interna y externa, orientada a la identificación de oportunidades para la mejora continua de los procesos, servicios y prestaciones públicas centrados en el servicio al ciudadano y para resultados, proporcionando insumos para la adecuada rendición de cuentas.
-- Patrón de Diseño MVC
+El modelo se enmarca en por lo menos dos principios de la gestiï¿½n pï¿½blica de la calidad: principio de continuidad en la prestaciï¿½n de servicios, que propone que los servicios pï¿½blicos se prestarï¿½n de manera regular e ininterrumpida, previendo las medidas necesarias para evitar o minimizar los perjuicios que pudieran ocasionarle al ciudadano en las posibles suspensiones del servicio. Y el principio de evaluaciï¿½n permanente y mejora continua que propone que una gestiï¿½n pï¿½blica de calidad es aquella que contempla la evaluaciï¿½n permanente, interna y externa, orientada a la identificaciï¿½n de oportunidades para la mejora continua de los procesos, servicios y prestaciones pï¿½blicas centrados en el servicio al ciudadano y para resultados, proporcionando insumos para la adecuada rendiciï¿½n de cuentas.
+- Patrï¿½n de Diseï¿½o MVC
 - Entorno Visual
 - Usabilidad y Accesibilidad
-- Ayuda en línea
+- Ayuda en lï¿½nea
 - Interoperabilidad
 - Escalabilidad y extensibilidad
-- Alto grado de Parametrización
+- Alto grado de Parametrizaciï¿½n
 
 
-### Tecnologías
+### Tecnologï¿½as
 ---
-Para obtener las ventajas competitivas de la solución multipropósito deseada, es básico contar con las herramientas de tecnología necesarias.
+Para obtener las ventajas competitivas de la soluciï¿½n multipropï¿½sito deseada, es bï¿½sico contar con las herramientas de tecnologï¿½a necesarias.
 -	Arquitectura Web Enabled
 -	Base de Datos: PostgreSQL como servidor de Base de Datos Relacional
 -	Servidor Web: Apache 2.4
--	Librerías para interfase: BootStrap
+-	Librerï¿½as para interfase: BootStrap
 -	Lenguaje de Desarrollo: PHP 7.0
 -	Framework Yii 2.0
-Las PC clientes, deberán disponer de un navegador Web de última generación.
+Las PC clientes, deberï¿½n disponer de un navegador Web de ï¿½ltima generaciï¿½n.
 
 
 ### Autor/es
@@ -146,10 +380,10 @@ Las PC clientes, deberán disponer de un navegador Web de última generación.
 - ISUR
 
 
-### Información adicional
+### Informaciï¿½n adicional
 ---
-Se deberá contar con un Servidor de Base de Datos y Aplicaciones, preferentemente en Linux.
-Se podrá migrar la información existente actualmente.
+Se deberï¿½ contar con un Servidor de Base de Datos y Aplicaciones, preferentemente en Linux.
+Se podrï¿½ migrar la informaciï¿½n existente actualmente.
 
 
 ### Licencia 
@@ -157,10 +391,10 @@ Se podrá migrar la información existente actualmente.
 [LICENCIA](https://github.com/isurgob/isurgob/blob/master/LICENSE.md)
 
 
-## Limitación de responsabilidades
+## Limitaciï¿½n de responsabilidades
 
-ISUR, los autores mencionados, y el BID no serán responsables, bajo circunstancia alguna, de daño ni indemnización, moral o patrimonial; directo o indirecto; accesorio o especial; o por vía de consecuencia, previsto o imprevisto, que pudiese surgir:
+ISUR, los autores mencionados, y el BID no serï¿½n responsables, bajo circunstancia alguna, de daï¿½o ni indemnizaciï¿½n, moral o patrimonial; directo o indirecto; accesorio o especial; o por vï¿½a de consecuencia, previsto o imprevisto, que pudiese surgir:
 
-i. Bajo cualquier teoría de responsabilidad, ya sea por contrato, infracción de derechos de propiedad intelectual, negligencia o bajo cualquier otra teoría; y/o
+i. Bajo cualquier teorï¿½a de responsabilidad, ya sea por contrato, infracciï¿½n de derechos de propiedad intelectual, negligencia o bajo cualquier otra teorï¿½a; y/o
 
-ii. A raíz del uso de la Herramienta Digital, incluyendo, pero sin limitación de potenciales defectos en la Herramienta Digital, o la pérdida o inexactitud de los datos de cualquier tipo. Lo anterior incluye los gastos o daños asociados a fallas de comunicación y/o fallas de funcionamiento de computadoras, vinculados con la utilización de la Herramienta Digital.
+ii. A raï¿½z del uso de la Herramienta Digital, incluyendo, pero sin limitaciï¿½n de potenciales defectos en la Herramienta Digital, o la pï¿½rdida o inexactitud de los datos de cualquier tipo. Lo anterior incluye los gastos o daï¿½os asociados a fallas de comunicaciï¿½n y/o fallas de funcionamiento de computadoras, vinculados con la utilizaciï¿½n de la Herramienta Digital.
